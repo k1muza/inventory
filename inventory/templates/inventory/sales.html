@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}Sales{% endblock %}
+
+{% block content %}
+  <h2 class="mb-4">Sales</h2>
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      {{ form.sales_data.label_tag }}
+      {{ form.sales_data }}
+      {% if form.sales_data.help_text %}
+        <small class="form-text text-muted">{{ form.sales_data.help_text }}</small>
+      {% endif %}
+    </div>
+    <div class="mb-3">
+        {{ form.date.label_tag }}
+        {{ form.date }}
+        {% if form.date.help_text %}
+          <small class="form-text text-muted">{{ form.date.help_text }}</small>
+        {% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary">Process Sales</button>
+  </form>
+{% endblock %}

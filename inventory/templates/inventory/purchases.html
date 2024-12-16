@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Purchases{% endblock %}
+
+{% block content %}
+  <h2 class="mb-4">Purchases</h2>
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      {{ form.purchases_data.label_tag }}
+      {{ form.purchases_data }}
+      {% if form.purchases_data.help_text %}
+        <small class="form-text text-muted">{{ form.purchases_data.help_text }}</small>
+      {% endif %}
+    </div>
+    <div class="mb-3">
+        {{ form.date.label_tag }}
+        {{ form.date }}
+        {% if form.date.help_text %}
+          <small class="form-text text-muted">{{ form.date.help_text }}</small>
+        {% endif %}
+    </div>
+    <div class="mb-3">
+        {{ form.create_missing_products }}
+        {% if form.create_missing_products.help_text %}
+          <small class="form-text text-muted">{{ form.create_missing_products.help_text }}</small>
+        {% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary">Process Purchases</button>
+  </form>
+{% endblock %}

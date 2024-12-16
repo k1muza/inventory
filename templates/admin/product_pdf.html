@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ product.name }} Report</title>
+    <style>
+    body {
+        font-family: sans-serif;
+    }
+    h1 {
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+    h2 {
+        font-size: 16px;
+        margin-top: 20px;
+    }
+    table {
+        width:100%;
+        border-collapse: collapse;
+        margin-top:20px;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding:8px;
+    }
+    th {
+        background: #f4f4f4;
+    }
+    </style>
+</head>
+<body>
+    <h1>Product: {{ product.name }}</h1>
+    <p>Stock Level: {{ product.stock_level }}</p>
+    <p>Stock Value: {{ product.stock_value }}</p>
+
+    <h2>Stock Movements</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Quantity</th>
+                <th>Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for movement in movements %}
+            <tr>
+                <td>{{ movement.date|date:"Y-m-d" }}</td>
+                <td>{{ movement.movement_type }}</td>
+                <td>{{ movement.quantity }}</td>
+                <td>{{ movement.running_balance }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="4">No stock movements found.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
