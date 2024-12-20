@@ -31,8 +31,11 @@
 </head>
 <body>
     <h1>Product: {{ product.name }}</h1>
-    <p>Stock Level: {{ product.stock_level }}</p>
-    <p>Stock Value: {{ product.stock_value }}</p>
+    <p>Stock Level: {{ product.stock_level|floatformat:1 }} {{product.unit}}</p>
+    <p>Stock Value: ${{ product.stock_value|floatformat:2 }}</p>
+    <p>Days Until Empty: {{ product.days_until_stockout|floatformat:2 }}</p>
+    <p>Average Consumption: {{ product.average_consumption|floatformat:2 }} {{product.unit}} / day</p>
+    <p>Average Profit: ${{ product.average_gross_profit|floatformat:2 }} / day</p>
 
     <h2>Stock Movements</h2>
     <table>
@@ -49,8 +52,8 @@
             <tr>
                 <td>{{ movement.date|date:"Y-m-d" }}</td>
                 <td>{{ movement.movement_type }}</td>
-                <td>{{ movement.quantity }}</td>
-                <td>{{ movement.running_balance }}</td>
+                <td>{{ movement.quantity|floatformat:1 }}</td>
+                <td>{{ movement.running_balance|floatformat:1 }}</td>
             </tr>
         {% empty %}
             <tr>

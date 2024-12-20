@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Suggested Budget</title>
+    <style>
+    body {
+        font-family: sans-serif;
+    }
+    h1 {
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+    table {
+        width:100%;
+        border-collapse: collapse;
+        margin-top:20px;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding:8px;
+    }
+    th {
+        background: #f4f4f4;
+    }
+    </style>
+</head>
+<body>
+    <h1>Suggested Purchase Budget</h1>
+    <p>Generated at: {{ generated_at|date:"Y-m-d H:i" }}</p>
+    <p>Suggested list of products to reorder, resulting stock should last for more than {{reorder_interval}} days</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Stock Level</th>
+                <th>Days to finish</th>
+                <th>Purchase Quantity</th>
+                <th>Purchase Price</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for product in products %}
+            <tr>
+                <td>{{ product.name }}</td>
+                <td>{{ product.stock_level|floatformat:2 }}</td>
+                <td>{{ product.days_until_stockout|floatformat:2 }}</td>
+                <td>{{ product.batch_sized_reorder_quantity|floatformat:2 }} {{product.unit}}</td>
+                <td>${{ product.batch_sized_reorder_value|floatformat:2 }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="4">No products found that can last more than a week.</td>
+            </tr>
+        {% endfor %}
+            <tr>
+                <td>Total <strong>${{total_reorder_cost|floatformat:2}}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

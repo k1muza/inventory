@@ -4,14 +4,8 @@ import re
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.db import transaction
-from .models import Product, Purchase, Sale, StockMovement
-from .forms import PurchasesForm, SalesForm, StockAdjustmentForm
-
-
-def product_list(request):
-    products = Product.objects.all()
-    return render(request, 'inventory/product_list.html', {'products': products})
-
+from .models import Cutting, Product, Purchase, Sale, StockMovement
+from .forms import CuttingForm, PurchasesForm, SalesForm, StockAdjustmentForm
 
 @transaction.atomic
 def stock_new(request):
@@ -26,6 +20,8 @@ def stock_new(request):
 
             f = StringIO(stock_data)
             reader = csv.reader(f, delimiter=',', skipinitialspace=True)
+
+            purchase, _ = Purchase.objects.get_or_create(date=stock_date, is_initial_stock=True)
 
             for line in reader:
                 # Parse each line
@@ -59,6 +55,8 @@ def stock_new(request):
                 )
                 adjustments.append(adjustment)
 
+                purchase.items.create(product=product, quantity=quantity, unit_cost=purchase_price)
+
             # Save adjustments
             for adjustment in adjustments:
                 adjustment.save()
@@ -74,7 +72,7 @@ def stock_new(request):
     else:
         form = StockAdjustmentForm()
 
-    return render(request, 'inventory/stock_take.html', {'form': form})
+    return render(request, 'inventory/stock_form.html', {'form': form})
 
 
 @transaction.atomic
@@ -100,10 +98,6 @@ def sales_new(request):
                 except Product.DoesNotExist:
                     errors.append(f"Product '{product_name}' not found.")
                     continue
-
-                # system_quantity = product.stock_level
-                # if system_quantity < quantity:
-                #     errors.append(f"Insufficient stock for '{product_name}'.")
                 
                 sale.items.create(product=product, quantity=quantity, unit_price=product.selling_price)
 
@@ -117,7 +111,7 @@ def sales_new(request):
             return redirect('inventory:sales_new')
     
     form = SalesForm()
-    return render(request, 'inventory/sales.html', {'form': form})
+    return render(request, 'inventory/sale_form.html', {'form': form})
 
 
 @transaction.atomic
@@ -135,7 +129,6 @@ def purchases_new(request):
             purchase, _ = Purchase.objects.get_or_create(date=purchases_date)
 
             for line in reader:
-                print(line)
                 product_name = line[0].strip()
                 purchase_price = float(line[1].strip())
                 quantity = float(line[2].strip())
@@ -154,7 +147,7 @@ def purchases_new(request):
                         errors.append(f"Product '{product_name}' not found.")
                         continue
 
-                purchase.items.create(product=product, quantity=quantity, unit_price=purchase_price)
+                purchase.items.create(product=product, quantity=quantity, unit_cost=purchase_price)
                 
             if errors:
                 messages.error(request, "Some errors occurred during processing:")
@@ -166,4 +159,35 @@ def purchases_new(request):
             return redirect('inventory:purchases_new')
         
     form = PurchasesForm()
-    return render(request, 'inventory/purchases.html', {'form': form})
+    return render(request, 'inventory/purchase_form.html', {'form': form})
+
+
+def cutting_new(request):
+    if request.method == 'POST':
+        form = CuttingForm(request.POST)
+        if form.is_valid():
+            # Extract cleaned data
+            lot = form.cleaned_data['lot']
+            quantity_reduction = form.cleaned_data['quantity_reduction']
+            quantity = form.cleaned_data['quantity']
+            unit_cost = form.cleaned_data['unit_cost']
+            date = form.cleaned_data['date']
+
+            # Create and save the Cutting instance
+            Cutting.objects.create(
+                lot=lot,
+                quantity=quantity,
+                quantity_reduction=quantity_reduction,
+                unit_cost=unit_cost,
+                date=date
+            )
+
+            messages.success(request, "Cutting record created successfully!")
+            return redirect('cutting_list')  # Adjust redirect to an appropriate view
+        else:
+            # Form invalid, show errors
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = CuttingForm()
+
+    return render(request, 'inventory/cutting_form.html', {'form': form})

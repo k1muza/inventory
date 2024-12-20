@@ -1,15 +1,29 @@
+from datetime import timedelta
+from django.utils import timezone
 from django.contrib import admin
 from django.db.models import Sum
 from django.urls import path
 from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
+from django.conf import settings
 from weasyprint import HTML
 
-from .models import Expense, Report, Supplier, Product, StockMovement, Purchase, PurchaseItem, Sale, SaleItem, Transaction
+from .models import Cutting, Expense, Lot, LotConsumption, Report, Supplier, Product, StockMovement, Purchase, PurchaseItem, Sale, SaleItem, Transaction
 
 
 admin.site.register(Supplier)
-admin.site.register(StockMovement)
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(admin.ModelAdmin):
+    list_display = ('date', 'product', 'movement_type', 'quantity')
+    list_filter = ('date', 'movement_type')
+    search_fields = ('product__name',)
+    ordering = ('-date',)
+
+    @admin.display(description='Product')
+    def product(self, obj):
+        return obj.product
 
 
 @admin.register(Transaction)
@@ -57,18 +71,22 @@ class StockMovementInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     change_form_template = "admin/product_change_form.html"
+    change_list_template = "admin/product_change_list.html"
+
     list_display = (
         'name', 
-        'purchase_price', 
-        'selling_price', 
-        'stock_level',
+        'purchase_price',
+        'stock_level', 
         'stock_value',
+        'days_to_sell_out',
         'average_consumption',
+        'average_gross_profit',
     )
     readonly_fields = (
         'stock_level', 
         'stock_value', 
         'average_consumption', 
+        'average_gross_profit',
         'is_below_minimum_stock'
     )
     list_filter = ('unit',)
@@ -76,7 +94,7 @@ class ProductAdmin(admin.ModelAdmin):
     inlines = [StockMovementInline]
     fieldsets = (
         (None, {
-            'fields': ('name', 'unit')
+            'fields': ('name', 'unit', 'batch_size')
         }),
         ('Pricing', {
             'fields': ('purchase_price', 'selling_price')
@@ -89,27 +107,37 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('description',)
         }),
     )
+    actions = ['generate_suggested_budget']
 
     @admin.display(description="Stock Level")
-    def stock_level(self, obj):
+    def stock_level(self, obj: Product):
         return f"{obj.stock_level:.2f} {obj.unit}"
     
     @admin.display(description="Stock Value")
-    def stock_value(self, obj):
+    def stock_value(self, obj: Product):
         return f"${obj.stock_value:.2f}"
 
     @admin.display(description="Below Minimum Stock", boolean=True)
-    def is_below_minimum_stock(self, obj):
+    def is_below_minimum_stock(self, obj: Product):
         return obj.is_below_minimum_stock()
     
-    @admin.display(description="Average Consumption")
-    def average_consumption(self, obj):
-        return f"{obj.average_consumption_past_week:.2f} {obj.unit}/day"
+    @admin.display(description="Av Consumption/Day")
+    def average_consumption(self, obj: Product):
+        return f"{obj.average_consumption:.2f} {obj.unit}"
+    
+    @admin.display(description="Av Profit/Day")
+    def average_gross_profit(self, obj: Product):
+        return f"${obj.average_gross_profit:.2f}"
+    
+    @admin.display(description="Days to Sell Out")
+    def days_to_sell_out(self, obj: Product):
+        return f"{obj.days_until_stockout:.2f} days"
     
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
             path('<int:object_id>/download-pdf/', self.admin_site.admin_view(self.download_pdf), name='product-download-pdf'),
+            path('suggest-budget/', self.admin_site.admin_view(self.suggest_budget_view), name='product-suggest-budget'),
         ]
         return custom_urls + urls
 
@@ -129,7 +157,7 @@ class ProductAdmin(admin.ModelAdmin):
             movements_with_balance.append({
                 'date': m.date,
                 'movement_type': m.get_movement_type_display(),
-                'quantity': m.quantity,
+                'quantity': int(m.quantity) if product.unit == 'unit' else f"{m.quantity:.2f}",
                 'reference': getattr(m, 'reference', ''),
                 'running_balance': running_balance,
             })
@@ -149,16 +177,44 @@ class ProductAdmin(admin.ModelAdmin):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
+    def suggest_budget_view(self, request):
+        products = Product.objects.all()
+        suggested_purchases = []
+        total_reorder_cost = 0
+        for p in products:
+            req = p.reorder_quantity
+            if req > 0:
+                suggested_purchases.append(p)
+                total_reorder_cost += p.batch_sized_reorder_value
+
+        # Render HTML template for PDF
+        html_content = render(request, 'admin/product_suggested_budget.html', {
+            'products': suggested_purchases,
+            'total_reorder_cost': total_reorder_cost,
+            'generated_at': timezone.now(),
+            'reorder_interval': settings.REORDER_INTERVAL_DAYS,
+        }).content.decode('utf-8')
+
+        # Generate PDF using WeasyPrint
+        pdf = HTML(string=html_content).write_pdf()
+
+        # Return as PDF download
+        response = HttpResponse(pdf, content_type='application/pdf')
+        filename = "suggested_budget.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
 
 class PurchaseItemInline(admin.TabularInline):
     model = PurchaseItem
     extra = 0
-    fields = ('product', 'quantity', 'unit_price', 'line_total',)
+    fields = ('product', 'quantity', 'unit_cost', 'line_total',)
     readonly_fields = ('line_total',)
 
     @admin.display(description='Line Total')
     def line_total(self, obj):
         return f"${obj.line_total:.2f}"
+
 
 @admin.register(Purchase)
 class PurchaseAdmin(admin.ModelAdmin):
@@ -167,6 +223,7 @@ class PurchaseAdmin(admin.ModelAdmin):
     list_filter = ('date',)
     search_fields = ('notes',)
     readonly_fields = ('total_amount',)
+    ordering = ('-date',)
 
     fieldsets = (
         (None, {
@@ -199,11 +256,19 @@ class SaleItemInline(admin.TabularInline):
 
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
-    list_display = ('date', 'total_amount', 'cost_of_goods_sold', 'gross_profit', 'gross_margin')
+    list_display = (
+        'date', 
+        'total_amount', 
+        'cost_of_goods_sold', 
+        'cost',
+        'gross_profit', 
+        'profit', 
+        'gross_margin'
+    )
     inlines = [SaleItemInline]
     list_filter = ('date',)
     search_fields = ('notes',)
-    readonly_fields = ('total_amount', 'cost_of_goods_sold', 'gross_profit', 'gross_margin')
+    readonly_fields = ('total_amount', 'cost_of_goods_sold', 'gross_profit', 'profit', 'gross_margin')
 
     fieldsets = (
         (None, {
@@ -231,9 +296,17 @@ class SaleAdmin(admin.ModelAdmin):
     def cost_of_goods_sold(self, obj):
         return f"${obj.cost_of_goods_sold:.2f}"
     
+    @admin.display(description='Cost')
+    def cost(self, obj: Sale):
+        return f"${obj.cost:.2f}"
+    
     @admin.display(description="Gross Profit")
     def gross_profit(self, obj):
         return f"${obj.gross_profit:.2f}"
+    
+    @admin.display(description="Profit")
+    def profit(self, obj: Sale):
+        return f"${obj.profit:.2f}"
     
     @admin.display(description="Gross Margin")
     def gross_margin(self, obj):
@@ -337,3 +410,52 @@ class ReportAdmin(admin.ModelAdmin):
     @admin.display(description='Closing Cash')
     def closing_cash(self, obj):
         return f"${obj.closing_cash:.2f}"
+
+
+class LotConsumptionInline(admin.TabularInline):
+    model = LotConsumption
+    extra = 0
+    fields = ('date_consumed', 'quantity')
+    can_delete = False
+    ordering = ('date_consumed',)
+
+
+@admin.register(Lot)
+class LotAdmin(admin.ModelAdmin):
+    list_display = (
+        'date_received', 
+        'purchase_item__product__name', 
+        'purchase_item__quantity', 
+        'quantity_remaining', 
+        'sales_count',
+        'in_stock',
+    )
+    list_filter = ('date_received',)
+    search_fields = ('purchase_item__product__name',)
+    inlines = [LotConsumptionInline]
+    readonly_fields = ('quantity_remaining', 'is_empty')
+    ordering = ('-date_received',)
+
+    @admin.display(description='Quantity Remaining')
+    def quantity_remaining(self, obj: Lot):
+        return f"{obj.quantity_remaining:.2f} {obj.purchase_item.product.unit}"
+    
+    @admin.display(description='In Stock', boolean=True)
+    def in_stock(self, obj: Lot):
+        return not obj.is_empty
+    
+    @admin.display(description='Sales Count')
+    def sales_count(self, obj: Lot):
+        return obj.consumptions.count()
+
+
+@admin.register(Cutting)
+class CuttingAdmin(admin.ModelAdmin):
+    list_display = ('date', 'lot__purchase_item__product__name', 'quantity', 'unit_cost', 'total_cost')
+    list_filter = ('date', 'lot__purchase_item__product__name')
+    search_fields = ('lot__purchase_item__product__name',)
+    ordering = ('-date',)
+
+    @admin.display(description='Total Cost')
+    def total_cost(self, obj: Cutting):
+        return f"${obj.total_cost:.2f}"
