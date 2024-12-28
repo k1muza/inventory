@@ -2,7 +2,7 @@ from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from .models import Cutting, Expense, Lot, LotConsumption, PurchaseItem, SaleItem, StockMovement, Transaction
+from .models import Cutting, Expense, Lot, LotMovement, PurchaseItem, SaleItem, StockMovement, Transaction
 
 
 @receiver(post_save, sender=PurchaseItem)
@@ -18,10 +18,20 @@ def create_stock_movement_purchase(sender, instance: PurchaseItem, created, **kw
             "date": instance.purchase.date,
         }
     )
-    Lot.objects.get_or_create(
+    lot, _ = Lot.objects.get_or_create(
         purchase_item=instance,
         defaults=dict(
             date_received=instance.purchase.date,
+        )
+    )
+
+    LotMovement.objects.get_or_create(
+        lot=lot,
+        date=instance.purchase.date,
+        quantity=instance.quantity,
+        movement_type=LotMovement.MovementType.IN,
+        defaults=dict(
+            description=f"Initial stock of {instance.quantity} {instance.product.unit} {instance.product.name}",
         )
     )
 
@@ -79,17 +89,18 @@ def create_stock_movement_sale(sender, instance: SaleItem, created, **kwargs):
 
 @receiver(pre_delete, sender=SaleItem)
 def delete_stock_movement_sale(sender, instance: SaleItem, **kwargs):
-    purchase_ct = ContentType.objects.get_for_model(SaleItem)
+    saleitem_ct = ContentType.objects.get_for_model(SaleItem)
     StockMovement.objects.filter(
-        content_type=purchase_ct,
+        content_type=saleitem_ct,
         object_id=instance.id,
     ).delete()
     Transaction.objects.filter(
-        content_type=purchase_ct,
+        content_type=saleitem_ct,
         object_id=instance.id,
     ).delete()
-    LotConsumption.objects.filter(
-        sale_item=instance,
+    LotMovement.objects.filter(
+        content_type=saleitem_ct,
+        object_id=instance.id,
     ).delete()
 
 
@@ -103,7 +114,7 @@ def consume_lots(sender, instance: SaleItem, created, **kwargs):
         
         outstanding = lot.consume(outstanding, instance)
         
-        if outstanding == 0:
+        if outstanding <= 0:
             break
 
 
@@ -120,6 +131,14 @@ def create_transaction_expense(sender, instance: Expense, created, **kwargs):
         )
     )
 
+@receiver(pre_delete, sender=Expense)
+def delete_transaction_expense(sender, instance: Expense, **kwargs):
+    purchase_ct = ContentType.objects.get_for_model(Expense)
+    Transaction.objects.filter(
+        content_type=purchase_ct,
+        object_id=instance.id,
+    ).delete()
+
 
 @receiver(post_save, sender=Cutting)
 def create_stock_movement_cutting(sender, instance: Cutting, created, **kwargs):
@@ -130,7 +149,7 @@ def create_stock_movement_cutting(sender, instance: Cutting, created, **kwargs):
         defaults=dict(
             product=instance.lot.purchase_item.product,
             movement_type='OUT',
-            quantity=instance.quantity_reduction,
+            quantity=instance.starting_weight - instance.ending_weight,
             date=instance.date,
         )
     )
@@ -139,13 +158,16 @@ def create_stock_movement_cutting(sender, instance: Cutting, created, **kwargs):
         object_id=instance.id,
         defaults=dict(
             date=instance.date,
-            transaction_type='CUTTING',
-            amount=instance.unit_cost*instance.quantity,
+            transaction_type='EXPENSE',
+            amount=instance.total_cost,
         )
     )
-    LotConsumption.objects.get_or_create(
+    LotMovement.objects.get_or_create(
         lot=instance.lot,
-        date_consumed=instance.date,
-        quantity=instance.quantity_reduction,
-        description=f"Cutting {instance.quantity} {instance.lot.purchase_item.product.unit} {instance.lot.purchase_item.product.name}",
+        date=instance.date,
+        quantity=instance.starting_weight - instance.ending_weight,
+        movement_type=LotMovement.MovementType.OUT,
+        defaults=dict(
+            description=f"Cutting {instance.starting_weight} {instance.lot.purchase_item.product.unit} {instance.lot.purchase_item.product.name}",
+        )
     )

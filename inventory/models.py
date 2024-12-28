@@ -1,11 +1,12 @@
 from datetime import timedelta
-from decimal import Decimal
 import math
 from django.db import models
+from django.forms import FloatField
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count
+from django.db.models.functions import Coalesce
 from django.conf import settings
 
 
@@ -28,6 +29,7 @@ class Product(models.Model):
     minimum_stock_level = models.PositiveIntegerField(default=0)
     unit = models.CharField(max_length=20, blank=True)
     batch_size = models.PositiveIntegerField(default=1)
+    predict_demand = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.name}"
@@ -47,8 +49,8 @@ class Product(models.Model):
         Calculate current stock level based on lots.
         """
         lots_quantities = self.lots.all().aggregate(total=models.Sum('quantity'))['total'] or 0
-        consumptions = self.lots.all().aggregate(total=models.Sum('consumptions__quantity'))['total'] or 0
-        return lots_quantities - consumptions
+        movements = self.lots.all().aggregate(total=models.Sum('movements__quantity'))['total'] or 0
+        return lots_quantities - movements
     
     @property
     def stock_value(self):
@@ -70,6 +72,158 @@ class Product(models.Model):
 
     @property
     def average_consumption(self):
+        """
+        Compute average based on the last N in-stock SaleItems, ignoring items
+        that were partially out of stock (net_stock < item.quantity).
+        """
+        N = settings.AVERAGE_INTERVAL_DAYS  # or a fixed integer like 7
+        
+        # 1. Start with all SaleItems of this product.
+        queryset = SaleItem.objects.filter(product=self)
+
+        # 2. Annotate how much stock was available at sale time.
+        #    This is the same logic as before to figure out in-stock vs out-of-stock.
+        annotated_items = queryset.annotate(
+            stock_in=Coalesce(
+                Sum(
+                    'product__stock_movements__quantity',
+                    filter=Q(
+                        product__stock_movements__movement_type='IN',
+                        product__stock_movements__date__lt=F('sale__date')
+                    )
+                ), 
+                0
+            ),
+            stock_out=Coalesce(
+                Sum(
+                    'product__stock_movements__quantity',
+                    filter=Q(
+                        product__stock_movements__movement_type='OUT',
+                        product__stock_movements__date__lt=F('sale__date')
+                    )
+                ), 
+                0
+            ),
+        ).annotate(
+            net_stock=ExpressionWrapper(
+                F('stock_in') - F('stock_out'),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            )
+        )
+
+        # 3. Filter to keep only items that were fully in stock at the time of sale.
+        #    net_stock > quantity => not limited by stock.
+        in_stock_items = (
+            annotated_items
+            .filter(net_stock__gte=F('quantity'))
+            .order_by('-sale__date')  # most recent items first
+        )
+
+        # 4. Limit to the last N items
+        last_n_items = in_stock_items[:N]
+
+        # 5. Aggregate total quantity and count.
+        aggs = last_n_items.aggregate(
+            total_quantity=Coalesce(Sum('quantity'), 0.0),
+            total_count=Coalesce(Count('id'), 0)
+        )
+        total_quantity = aggs['total_quantity']
+        total_count = aggs['total_count']
+
+        if total_count > 0:
+            average = total_quantity / total_count
+        else:
+            average = 0
+        
+        return average
+    
+    @property
+    def average_consumption_v3(self):
+        """
+        Compute average consumption (items not limited by stock) for this product
+        over the last N days using database aggregation.
+        """
+        days = settings.AVERAGE_INTERVAL_DAYS
+        cutoff_date = timezone.now() - timedelta(days=days)
+
+        # 1. Annotate each SaleItem with how much stock was IN vs. OUT
+        #    up to the date of the sale. We'll call these fields 'stock_in' and 'stock_out'.
+        annotated_items = (
+            SaleItem.objects
+            .filter(
+                product=self,
+                sale__date__gte=cutoff_date
+            )
+            # We'll use conditional aggregates to sum stock movements
+            # that are <= the sale date for each SaleItem.
+            .annotate(
+                stock_in=Coalesce(
+                    Sum(
+                        'product__stock_movements__quantity',
+                        filter=Q(
+                            product__stock_movements__movement_type='IN',
+                            product__stock_movements__date__lte=F('sale__date')
+                        )
+                    ), 
+                    0
+                ),
+                stock_out=Coalesce(
+                    Sum(
+                        'product__stock_movements__quantity',
+                        filter=Q(
+                            product__stock_movements__movement_type='OUT',
+                            product__stock_movements__date__lte=F('sale__date')
+                        )
+                    ), 
+                    0
+                ),
+            )
+            # 2. We only keep SaleItems where net_stock >= item.quantity.
+            .annotate(
+                net_stock=ExpressionWrapper(
+                    F('stock_in') - F('stock_out'),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                )
+            )
+            .filter(net_stock__gt=F('quantity'))
+        )
+
+        # 3. Now aggregate to get total quantity and total item count
+        aggregations = annotated_items.aggregate(
+            total_quantity=Coalesce(Sum('quantity'), 0.0),
+            total_count=Coalesce(Count('id'), 0)
+        )
+
+        total_quantity = aggregations['total_quantity']
+        total_count = aggregations['total_count']
+
+        if total_count > 0:
+            # Example: average per item over the last N days
+            average = total_quantity / total_count
+        else:
+            average = 0
+
+        return average
+    
+    @property
+    def average_consumption_v2(self):        
+        # Filter SaleItems related to this product and sold in the last 7 days
+        items = SaleItem.objects.filter(
+            product=self,
+        ).order_by(
+            '-sale__date'
+        )
+
+        # Calculate total quantity sold in the last 7 days
+        total_quantity = sum([item.quantity for item in items if not item.limited_by_stock][:settings.AVERAGE_INTERVAL_DAYS])
+        total_count = len([item for item in items if not item.limited_by_stock][:settings.AVERAGE_INTERVAL_DAYS])
+        
+        # Divide by 7 to get average daily consumption
+        average_daily = (total_quantity / total_count) if total_count else 0
+        return average_daily
+    
+    @property
+    def average_consumption_v1(self):
         # Define the time window: now minus 7 days
         now = timezone.now()
         one_week_ago = now - timedelta(days=7)
@@ -112,11 +266,17 @@ class Product(models.Model):
     
     @property
     def reorder_value(self):
-        return self.reorder_quantity * float(self.purchase_price)
-    
+        purchase_item = self.purchase_items.latest('purchase__date')
+        if purchase_item is not None:
+            return self.reorder_quantity * float(purchase_item.unit_cost)
+        return 0
+        
     @property
     def batch_sized_reorder_value(self):
-        return self.batch_sized_reorder_quantity * float(self.purchase_price)
+        purchase_item = self.purchase_items.latest('purchase__date')
+        if purchase_item is not None:
+            return self.batch_sized_reorder_quantity * float(purchase_item.unit_cost)
+        return 0
     
     @property
     def average_gross_profit(self):
@@ -128,6 +288,13 @@ class Product(models.Model):
         total_gross_profit = sum(item.gross_profit for item in sales)
         return total_gross_profit / settings.AVERAGE_INTERVAL_DAYS if total_gross_profit else 0
 
+    @property
+    def latest_unit_profit(self):
+        saleItem: SaleItem = self.sale_items.latest('sale__date')
+        if saleItem:
+            return saleItem.profit_per_unit
+        return 0
+    
     def get_stock_level(self, date):
         """
         Calculate stock level at a specific date.
@@ -179,7 +346,7 @@ class Purchase(models.Model):
 
 class PurchaseItem(models.Model):
     purchase = models.ForeignKey(Purchase, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='purchase_items')
     quantity = models.FloatField()
     unit_cost = models.DecimalField(max_digits=15, decimal_places=2)
 
@@ -211,13 +378,17 @@ class Sale(models.Model):
         return self.total_amount - self.cost_of_goods_sold
     
     @property
-    def consumptions(self):
-        return LotConsumption.objects.filter(sale_item__sale=self)
+    def movements(self):
+        saleitem_ct = ContentType.objects.get_for_model(SaleItem)
+        return LotMovement.objects.filter(
+            content_type=saleitem_ct,
+            object_id__in=[i['id'] for i in self.items.values('id')]
+        )
     
     @property
     def cost(self):
         return (
-            self.consumptions.annotate(
+            self.movements.annotate(
                 cost=ExpressionWrapper(
                     F('quantity') * F('lot__purchase_item__unit_cost'),
                     output_field=DecimalField(),
@@ -227,22 +398,23 @@ class Sale(models.Model):
     
     @property
     def profit(self):
-        profit_expr = ExpressionWrapper(
-            F('quantity') * (F('sale_item__unit_price') - F('lot__purchase_item__unit_cost')),
-            output_field=DecimalField(max_digits=15, decimal_places=2)
-        )
+        total_revenue = 0.0
+        for movement in self.movements.all():
+            # Check if movement.linked_object is a SaleItem
+            if movement.linked_object and type(movement.linked_object).__name__ == 'SaleItem':
+                sale_item: SaleItem = movement.linked_object
+                total_revenue += (movement.quantity * float(sale_item.unit_price))
 
-        aggregation = self.consumptions.aggregate(total_profit=Sum(profit_expr))
-        return aggregation['total_profit'] or Decimal('0.00')
+        return total_revenue - float(self.cost)
     
     @property
     def gross_margin(self):
-        return self.gross_profit/self.total_amount if self.total_amount else 0
+        return self.gross_profit / self.total_amount if self.total_amount else 0
 
 
 class SaleItem(models.Model):
     sale = models.ForeignKey(Sale, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='sale_items')
     quantity = models.FloatField()
     unit_price = models.DecimalField(max_digits=15, decimal_places=2)
 
@@ -262,15 +434,37 @@ class SaleItem(models.Model):
         return self.line_total - self.cost_of_goods_sold
     
     @property
-    def profit(self):
-        return (
-            self.consumptions.annotate(
-                profit=ExpressionWrapper(
-                    F('quantity') * (F('sale_item__unit_price') - F('lot__purchase_item__unit_cost')),
-                    output_field=DecimalField(),
-                )
-            ).aggregate(total=models.Sum('profit'))['total'] or 0
+    def movements(self): 
+        saleitem_ct = ContentType.objects.get_for_model(SaleItem)
+        return LotMovement.objects.filter(
+            object_id=self.pk,
+            content_type=saleitem_ct
         )
+    
+    @property
+    def profit(self):
+        return 0
+    
+    @property
+    def profit_per_unit(self):
+        return 0
+    
+    @property
+    def limited_by_stock(self):
+        stock_in = StockMovement.objects.filter(
+            product=self.product, 
+            movement_type='IN', 
+            date__lte=self.sale.date
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+
+        # Sum all OUT movements up to check_time
+        stock_out = StockMovement.objects.filter(
+            product=self.product, 
+            movement_type='OUT',
+            date__lte=self.sale.date
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+
+        return (stock_in - stock_out) <= self.quantity
 
 
 class Expense(models.Model):
@@ -325,7 +519,7 @@ class Report(models.Model):
     
     @property
     def gross_profit(self):
-        return sum(sale.gross_profit for sale in Sale.objects.filter(date__range=[self.open_date, self.close_date]))
+        return self.total_sales - self.cost_of_goods_sold
     
     @property
     def total_sales(self):
@@ -337,7 +531,7 @@ class Report(models.Model):
     
     @property
     def cost_of_goods_sold(self):
-        return sum(sale.cost_of_goods_sold for sale in Sale.objects.filter(date__range=[self.open_date, self.close_date]))
+        return self.opening_stock_value + self.total_purchases - self.closing_stock_value
     
     @property
     def total_expenses(self):
@@ -362,31 +556,79 @@ class Report(models.Model):
     @property
     def opening_stock_value(self):
         """
-        Calculate the total value of stock on hand at the start of the reporting period.
-        This considers all stock movements that occurred strictly before `open_date`.
+        Calculates the total value of all lots' stock on hand 
+        as of self.open_date, using each lot's purchase cost.
         """
-        total_value = 0
-        products = Product.objects.all()
-        for product in products:
-            stock_in = product.stock_movements.filter(movement_type='IN', date__lt=self.open_date).aggregate(total=Sum('quantity'))['total'] or 0
-            stock_out = product.stock_movements.filter(movement_type='OUT', date__lt=self.open_date).aggregate(total=Sum('quantity'))['total'] or 0
-            stock_level_at_open = stock_in - stock_out
-            total_value += stock_level_at_open * float(product.purchase_price)
+        total_value = 0.0
+
+        for lot in Lot.objects.filter(date_received__lt=self.open_date):
+            queryset = lot.movements.filter(
+                date__lt=self.open_date,
+                movement_type=LotMovement.MovementType.IN,
+            )
+            total_in = queryset.aggregate(
+                total=Coalesce(
+                    Sum(
+                        'quantity',
+                    ),
+                    0.0
+                )
+            )['total']
+                
+            total_out = lot.movements.filter(
+                date__lt=self.open_date,
+                movement_type=LotMovement.MovementType.OUT,
+            ).aggregate(
+                total=Coalesce(
+                    Sum(
+                        'quantity',
+                    ),
+                    0.0
+                )
+            )['total']
+
+            net_qty = total_in - total_out
+            total_value += (net_qty * float(lot.purchase_item.unit_cost))
+
         return total_value
     
     @property
     def closing_stock_value(self):
         """
-        Calculate the total value of stock on hand at the end of the reporting period.
-        This considers all stock movements that occurred strictly before `close_date`.
+        Calculates the total value of all lots' stock on hand 
+        as of self.close_date, using each lot's purchase cost.
         """
-        total_value = 0
-        products = Product.objects.all()
-        for product in products:
-            stock_in = product.stock_movements.filter(movement_type='IN', date__lt=self.close_date).aggregate(total=Sum('quantity'))['total'] or 0
-            stock_out = product.stock_movements.filter(movement_type='OUT', date__lt=self.close_date).aggregate(total=Sum('quantity'))['total'] or 0
-            stock_level_at_close = stock_in - stock_out
-            total_value += stock_level_at_close * float(product.purchase_price)
+        total_value = 0.0
+
+        for lot in Lot.objects.filter(date_received__lt=self.close_date):
+            queryset = lot.movements.filter(
+                date__lt=self.close_date,
+                movement_type=LotMovement.MovementType.IN,
+            )
+            total_in = queryset.aggregate(
+                total=Coalesce(
+                    Sum(
+                        'quantity',
+                    ),
+                    0.0
+                )
+            )['total']
+                
+            total_out = lot.movements.filter(
+                date__lt=self.close_date,
+                movement_type=LotMovement.MovementType.OUT,
+            ).aggregate(
+                total=Coalesce(
+                    Sum(
+                        'quantity',
+                    ),
+                    0.0
+                )
+            )['total']
+
+            net_qty = total_in - total_out
+            total_value += (net_qty * float(lot.purchase_item.unit_cost))
+
         return total_value
     
     @property
@@ -440,7 +682,10 @@ class Lot(models.Model):
     
     @property
     def quantity_remaining(self):
-        return self.purchase_item.quantity - (self.consumptions.aggregate(total=models.Sum('quantity'))['total'] or 0)
+        return self.purchase_item.quantity - (
+            self.movements.filter(
+                movement_type=LotMovement.MovementType.OUT,
+            ).aggregate(total=models.Sum('quantity'))['total'] or 0)
     
     @property
     def quantity_remaining_cost(self):
@@ -448,46 +693,61 @@ class Lot(models.Model):
     
     @property
     def is_empty(self):
-        return self.quantity_remaining == 0
+        return self.quantity_remaining <= 0
     
     @property
     def profit(self):
         """
         Calculate profit using database-level aggregation:
-        profit = sum(quantity * (selling_price - unit_cost)) for all consumptions
+        profit = sum(quantity * (selling_price - unit_cost)) for all movements
         This is equivalent to:
         profit = sum(quantity * selling_price) - unit_cost * sum(quantity)
         """
-        return (
-            self.consumptions.annotate(
-                profit=ExpressionWrapper(
-                    F('quantity') * (F('sale_item__unit_price') - F('lot__purchase_item__unit_cost')),
-                    output_field=DecimalField(),
-                )
-            ).aggregate(total=models.Sum('profit'))['total'] or 0
-        )
+        # return (
+        #     self.movements.annotate(
+        #         profit=ExpressionWrapper(
+        #             F('quantity') * (F('sale_item__unit_price') - F('lot__purchase_item__unit_cost')),
+        #             output_field=DecimalField(),
+        #         )
+        #     ).aggregate(total=models.Sum('profit'))['total'] or 0
+        # )
+        return 0
     
     def consume(self, quantity, sale_item: SaleItem=None):
         ear_marked = min(quantity, self.quantity_remaining)
+        sale_ct = ContentType.objects.get_for_model(SaleItem)
+        
         if self.quantity_remaining > 0 and ear_marked > 0:
-            self.consumptions.create(
+            self.movements.create(
                 lot=self, 
+                content_type=sale_ct,
+                object_id=sale_item.id if sale_item else None,
                 quantity=ear_marked, 
-                sale_item=sale_item,
-                date_consumed=sale_item.sale.date if sale_item else timezone.now()
+                date=sale_item.sale.date if sale_item else timezone.now(),
+                movement_type=LotMovement.MovementType.OUT,
             )
         return quantity - ear_marked
 
 
-class LotConsumption(models.Model):
-    lot = models.ForeignKey(Lot, on_delete=models.CASCADE, related_name='consumptions')
+class LotMovement(models.Model):
+    class MovementType(models.TextChoices):
+        IN = 'IN', 'Stock In'
+        OUT = 'OUT', 'Stock Out'
+        ADJUSTMENT = 'ADJ', 'Adjustment'
+        
+    lot = models.ForeignKey(Lot, on_delete=models.CASCADE, related_name='movements')
+    movement_type = models.CharField(max_length=10, choices=MovementType.choices)
     quantity = models.FloatField()
-    date_consumed = models.DateTimeField(default=timezone.now)
-    sale_item = models.ForeignKey(SaleItem, on_delete=models.CASCADE, null=True, blank=True, related_name='consumptions')
+    date = models.DateTimeField(default=timezone.now)
     description = models.CharField(max_length=255, blank=True, null=True)
+
+    # GenericForeignKey fields
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    linked_object = GenericForeignKey('content_type', 'object_id')
     
     def __str__(self):
-        return f"{self.lot.purchase_item.product.name} - {self.quantity} - {self.date_consumed.strftime('%Y-%m-%d')}"
+        return f"{self.lot.purchase_item.product.name} - {self.quantity} - {self.date.strftime('%Y-%m-%d')}"
     
     @property
     def cost(self):
@@ -506,14 +766,44 @@ class LotConsumption(models.Model):
 
 class Cutting(models.Model):
     lot = models.ForeignKey(Lot, on_delete=models.CASCADE)
-    quantity = models.DecimalField(max_digits=10, decimal_places=3)
-    quantity_reduction = models.DecimalField(max_digits=10, decimal_places=3)
+    starting_weight = models.DecimalField(max_digits=10, decimal_places=3)
+    ending_weight = models.DecimalField(max_digits=10, decimal_places=3)
     unit_cost = models.DecimalField(max_digits=15, decimal_places=2)
     date = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.lot.purchase_item.product.name} - {self.quantity_reduction} - {self.cost}"
-    
+        return f"{self.date.date()} {self.lot.purchase_item.product.name}"
+
     @property
     def total_cost(self):
-        return self.quantity * float(self.unit_cost)
+        return self.starting_weight * self.unit_cost
+
+    @property
+    def weight_reduction(self):
+        return self.starting_weight - self.ending_weight
+
+
+class MeatProcess(models.Model):
+    class ProcessType(models.TextChoices):
+        CUTTING = 'CUT', 'Cut'
+        SLICING = 'SLICE', 'Slice'
+        MINCING = 'MINCE', 'Mince'
+        PACKAGING = 'PACKAGE', 'Package'
+
+    lot = models.ForeignKey(Lot, on_delete=models.CASCADE)
+    process_type = models.CharField(max_length=20, choices=ProcessType.choices)
+    starting_weight = models.DecimalField(max_digits=10, decimal_places=3)
+    ending_weight = models.DecimalField(max_digits=10, decimal_places=3)
+    unit_cost = models.DecimalField(max_digits=15, decimal_places=2)
+    date = models.DateTimeField(default=timezone.now)
+    
+    def __str__(self):
+        return f"{self.date.date()} {self.get_process_type_display()} {self.lot.purchase_item.product.name}"
+
+    @property
+    def total_cost(self):
+        return self.starting_weight * self.unit_cost
+
+    @property
+    def weight_reduction(self):
+        return self.starting_weight - self.ending_weight

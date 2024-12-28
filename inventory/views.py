@@ -1,4 +1,5 @@
 import csv
+from decimal import Decimal
 from io import StringIO
 import re
 from django.shortcuts import render, redirect
@@ -76,7 +77,7 @@ def stock_new(request):
 
 
 @transaction.atomic
-def sales_new(request):
+def sales_form(request):
     if request.method == 'POST':
         form = SalesForm(request.POST)
         if form.is_valid():
@@ -90,8 +91,29 @@ def sales_new(request):
             sale, _ = Sale.objects.get_or_create(date=sales_date)
 
             for line in reader:
-                product_name = re.sub(r'\(.*?\)', '', line[0].strip()).strip()
-                quantity = float(line[1].strip())
+                # e.g. line[0] might be "Beef (5.50)", line[1] might be "4.365"
+                raw_product_name = line[0].strip()
+
+                # 1. Extract selling_price from parentheses, e.g. (5.50)
+                match = re.search(r'\((.*?)\)', raw_product_name)
+                if match:
+                    # Convert bracketed text to float
+                    selling_price = float(match.group(1))
+                else:
+                    # If there's no bracket, set a default or handle error
+                    selling_price = 0.0
+
+                # 2. Remove the (price) part from the product name
+                product_name = re.sub(r'\(.*?\)', '', raw_product_name).strip()
+
+                # 3. Parse quantity from second column
+                # e.g. "4.365" or "11.295"
+                quantity_str = line[1].strip()
+                try:
+                    quantity = float(quantity_str)
+                except ValueError:
+                    errors.append(f"Invalid quantity '{quantity_str}' for line: {line}")
+                    continue
 
                 try:
                     product = Product.objects.get(name__iexact=product_name)
@@ -99,7 +121,11 @@ def sales_new(request):
                     errors.append(f"Product '{product_name}' not found.")
                     continue
                 
-                sale.items.create(product=product, quantity=quantity, unit_price=product.selling_price)
+                sale.items.create(
+                    product=product,
+                    quantity=quantity,
+                    unit_price=selling_price  # bracketed price
+                )
 
             if errors:
                 messages.error(request, "Some errors occurred during processing:")
@@ -108,14 +134,14 @@ def sales_new(request):
             else:
                 messages.success(request, "Sales recorded successfully.")
 
-            return redirect('inventory:sales_new')
+            return redirect('inventory:sales_form')
     
     form = SalesForm()
     return render(request, 'inventory/sale_form.html', {'form': form})
 
 
 @transaction.atomic
-def purchases_new(request):
+def purchases_form(request):
     if request.method == 'POST':
         form = PurchasesForm(request.POST)
         if form.is_valid():
@@ -130,8 +156,15 @@ def purchases_new(request):
 
             for line in reader:
                 product_name = line[0].strip()
-                purchase_price = float(line[1].strip())
-                quantity = float(line[2].strip())
+                quantity_str = line[1].strip()
+                match = re.match(r'(\d+(\.\d+)?)', quantity_str)
+                if match:
+                    quantity = float(match.group(1))
+                else:
+                    messages.error(request, f"Invalid quantity: {quantity_str}")
+                    raise ValueError(f"Bad quantity format: {quantity_str}")
+                
+                purchase_price = float(line[2].replace('$', '').strip())
 
                 try:
                     product = Product.objects.get(name__iexact=product_name)
@@ -146,8 +179,9 @@ def purchases_new(request):
                     else:
                         errors.append(f"Product '{product_name}' not found.")
                         continue
-
-                purchase.items.create(product=product, quantity=quantity, unit_cost=purchase_price)
+                
+                unit_cost = purchase_price / quantity
+                purchase.items.create(product=product, quantity=quantity, unit_cost=unit_cost)
                 
             if errors:
                 messages.error(request, "Some errors occurred during processing:")
@@ -156,7 +190,7 @@ def purchases_new(request):
             else:
                 messages.success(request, "Purchases recorded successfully.")
 
-            return redirect('inventory:purchases_new')
+            return redirect('inventory:purchases_form')
         
     form = PurchasesForm()
     return render(request, 'inventory/purchase_form.html', {'form': form})

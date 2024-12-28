@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Income Statement</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { margin-bottom: 0.5em; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { padding: 8px; border: 1px solid #ccc; vertical-align: top; }
+    th { background: #f4f4f4; }
+    .right { text-align: right; }
+    .bold { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Income Statement</h1>
+  <p>Period: {{ report.open_date|date:"Y-m-d" }} to {{ report.close_date|date:"Y-m-d" }}</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Sales Section -->
+      <tr>
+        <td>Sales</td>
+        <td class="right">{{ report.total_sales|floatformat:2 }}</td>
+      </tr>
+
+      <!-- Cost of Goods Sold Section -->
+      <tr>
+        <th colspan="2">Cost of Goods Sold</th>
+      </tr>
+      <tr>
+        <td>Starting Inventory</td>
+        <td class="right">{{ report.opening_stock_value|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td>Add: Purchases</td>
+        <td class="right">{{ report.total_purchases|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td>Less: Ending Inventory</td>
+        <td class="right">({{ report.closing_stock_value|floatformat:2 }})</td>
+      </tr>
+      <tr class="bold">
+        <td>Cost of Goods Sold</td>
+        <td class="right">{{ report.cost_of_goods_sold|floatformat:2 }}</td>
+      </tr>
+
+      <!-- Gross Profit -->
+      <tr class="bold">
+        <td>Gross Profit</td>
+        <td class="right">{{ report.gross_profit|floatformat:2 }}</td>
+      </tr>
+
+      <!-- Expenses -->
+      <tr>
+        <td>Expenses</td>
+        <td class="right">{{ report.total_expenses|floatformat:2 }}</td>
+      </tr>
+
+      <!-- Net Profit -->
+      <tr class="bold">
+        <td>Net Profit</td>
+        <td class="right">{{ report.net_profit|floatformat:2 }}</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

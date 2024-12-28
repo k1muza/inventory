@@ -25,7 +25,7 @@ def test_lot_consumption_on_sale(
 
 
 @pytest.mark.django_db
-def test_lot_consumptions_on_sale(
+def test_lot_movements_on_sale(
     product_factory,
     purchase_item_factory, 
     sale_item_factory

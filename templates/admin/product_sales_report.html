@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{product.name}}</title>
+</head>
+
+<body>
+    <div>
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {{ sales|json_script:"sales-data" }}
+
+    <script>
+        const ctx = document.getElementById('myChart');
+        const productName = '{{product.name}}';
+        const sales = JSON.parse(document.getElementById('sales-data').textContent);
+        console.log(sales);
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: sales.map(sale => sale.date),
+                datasets: [{
+                    label: '{{product.name}}',
+                    data: sales.map(sale => sale.quantity),
+                    fill: false,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+        });
+    </script>
+
+</body>
+
+</html>

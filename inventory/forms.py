@@ -54,7 +54,7 @@ class PurchasesForm(forms.Form):
         widget=forms.Textarea(attrs={
             'rows': 15,
             'class': 'form-control',
-            'placeholder': 'Product Name, Quantity, Unit'
+            'placeholder': 'Product Name, Quantity, Price'
         }),
         label='Purchases Data',
         help_text='Enter purchases data in the format: Product Name, Quantity, Unit'

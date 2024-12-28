@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    {% if change %}
+        <li>
+            <a href="{% url 'admin:income-statement' object_id=original.pk %}" class="historylink">Income Statement</a>
+        </li>
+    {% endif %}
+{% endblock %}
