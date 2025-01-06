@@ -52,8 +52,8 @@
             <tr>
                 <td>{{ movement.date|date:"Y-m-d" }}</td>
                 <td>{{ movement.movement_type }}</td>
-                <td>{{ movement.quantity|floatformat:1 }}</td>
-                <td>{{ movement.running_balance|floatformat:1 }}</td>
+                <td>{{ movement.quantity|floatformat:2 }}</td>
+                <td>{{ movement.running_balance|floatformat:2 }}</td>
             </tr>
         {% empty %}
             <tr>

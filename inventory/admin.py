@@ -1,4 +1,3 @@
-from datetime import timedelta
 from django.utils import timezone
 from django.contrib import admin
 from django.db.models import Sum
@@ -6,9 +5,10 @@ from django.urls import path
 from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 from django.conf import settings
+from django.utils.safestring import mark_safe
 from weasyprint import HTML
 
-from .models import Cutting, Expense, Lot, LotMovement, Report, Supplier, Product, StockMovement, Purchase, PurchaseItem, Sale, SaleItem, Transaction
+from .models import Expense, StockAdjustment, StockBatch, BatchMovement, Report, StockConversion, Supplier, Product, StockMovement, Purchase, PurchaseItem, Sale, SaleItem, Transaction
 
 
 admin.site.register(Supplier)
@@ -40,8 +40,8 @@ class TransactionAdmin(admin.ModelAdmin):
 class StockMovementInline(admin.TabularInline):
     model = StockMovement
     extra = 0
-    readonly_fields = ('movement_type', 'quantity', 'date', 'balance_after')
-    fields = ('date', 'movement_type', 'quantity', 'balance_after')
+    readonly_fields = ('movement_type', 'type', 'quantity', 'date', 'balance_after', 'details')
+    fields = ('date', 'movement_type', 'type', 'quantity', 'balance_after', 'details')
     can_delete = False
     ordering = ('-date',)  # Ensures movements are in chronological order
 
@@ -57,6 +57,14 @@ class StockMovementInline(admin.TabularInline):
         ).aggregate(total=Sum('quantity'))['total'] or 0
         
         return f"{(stock_in - stock_out):.2f} {obj.product.unit}"
+    
+    @admin.display(description='Movement Type')
+    def type(self, obj):
+        return f"{obj.get_movement_type_display()} ({obj.linked_object.name})" if obj.linked_object else obj.get_movement_type_display()
+    
+    @admin.display(description='Details')
+    def details(self, obj: StockMovement):
+        return mark_safe(f'<a href="{obj.get_admin_url()}">View</a>')
 
     def has_add_permission(self, request, obj):
         return False  # Prevent adding new stock movements from the inline
@@ -76,7 +84,9 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = (
         'name', 
         'purchase_price',
+        'average_unit_cost',
         'stock_level', 
+        'batch_level',
         'stock_value',
         'days_to_sell_out',
         'average_consumption',
@@ -85,9 +95,11 @@ class ProductAdmin(admin.ModelAdmin):
     readonly_fields = (
         'stock_level', 
         'stock_value', 
+        'batch_level',
         'average_consumption', 
         'average_gross_profit',
-        'is_below_minimum_stock'
+        'average_unit_cost',
+        'is_below_minimum_stock',
     )
     list_filter = ('unit',)
     search_fields = ('name',)
@@ -112,6 +124,10 @@ class ProductAdmin(admin.ModelAdmin):
     def stock_level(self, obj: Product):
         return f"{obj.stock_level:.2f} {obj.unit}"
     
+    @admin.display(description="Batch Level")
+    def batch_level(self, obj: Product):
+        return f"{obj.batch_based_stock_level:.2f} {obj.unit}"
+    
     @admin.display(description="Stock Value")
     def stock_value(self, obj: Product):
         return f"${obj.stock_value:.2f}"
@@ -124,6 +140,10 @@ class ProductAdmin(admin.ModelAdmin):
     def average_consumption(self, obj: Product):
         return f"{obj.average_consumption:.2f} {obj.unit}"
     
+    @admin.display(description="Av Unit Cost")
+    def average_unit_cost(self, obj: Product):
+        return f"${obj.average_unit_cost}"
+    
     @admin.display(description="Av Profit/Day")
     def average_gross_profit(self, obj: Product):
         return f"${obj.average_gross_profit:.2f}"
@@ -131,7 +151,7 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.display(description="Days to Sell Out")
     def days_to_sell_out(self, obj: Product):
         return f"{obj.days_until_stockout:.2f} days"
-    
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
@@ -156,7 +176,7 @@ class ProductAdmin(admin.ModelAdmin):
 
             movements_with_balance.append({
                 'date': m.date,
-                'movement_type': m.get_movement_type_display(),
+                'movement_type': f"{m.get_movement_type_display()} ({m.linked_object.name})" if m.linked_object else m.get_movement_type_display(),
                 'quantity': int(m.quantity) if product.unit == 'unit' else f"{m.quantity:.2f}",
                 'reference': getattr(m, 'reference', ''),
                 'running_balance': running_balance,
@@ -226,9 +246,8 @@ class ProductAdmin(admin.ModelAdmin):
             'sales': items,
         }
 
-        print(context)
-
         return render(request, 'admin/product_sales_report.html', context)
+
 
 class PurchaseItemInline(admin.TabularInline):
     model = PurchaseItem
@@ -285,15 +304,13 @@ class SaleAdmin(admin.ModelAdmin):
         'date', 
         'total_amount', 
         'cost_of_goods_sold', 
-        'cost',
         'gross_profit', 
-        'profit', 
         'gross_margin'
     )
     inlines = [SaleItemInline]
     list_filter = ('date',)
     search_fields = ('notes',)
-    readonly_fields = ('total_amount', 'cost_of_goods_sold', 'gross_profit', 'profit', 'gross_margin')
+    readonly_fields = ('total_amount', 'cost_of_goods_sold', 'gross_profit', 'gross_margin')
 
     fieldsets = (
         (None, {
@@ -321,17 +338,9 @@ class SaleAdmin(admin.ModelAdmin):
     def cost_of_goods_sold(self, obj):
         return f"${obj.cost_of_goods_sold:.2f}"
     
-    @admin.display(description='Cost')
-    def cost(self, obj: Sale):
-        return f"${obj.cost:.2f}"
-    
     @admin.display(description="Gross Profit")
     def gross_profit(self, obj):
         return f"${obj.gross_profit:.2f}"
-    
-    @admin.display(description="Profit")
-    def profit(self, obj: Sale):
-        return f"${obj.profit:.2f}"
     
     @admin.display(description="Gross Margin")
     def gross_margin(self, obj):
@@ -367,7 +376,6 @@ class ReportAdmin(admin.ModelAdmin):
         'closing_stock',
         'opening_cash',
         'closing_cash',
-
     )
     ordering = ('-open_date',)
 
@@ -450,6 +458,16 @@ class ReportAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.download_income_statement),
                 name='income-statement',
             ),
+            path(
+                '<int:object_id>/open-balance-sheet/',
+                self.admin_site.admin_view(self.open_balance_sheet),
+                name='open-balance-sheet',
+            ),
+            path(
+                '<int:object_id>/close-balance-sheet/',
+                self.admin_site.admin_view(self.close_balance_sheet),
+                name='close-balance-sheet',
+            ),
         ]
         return custom_urls + urls
 
@@ -459,7 +477,7 @@ class ReportAdmin(admin.ModelAdmin):
         html_content = render(
             request,
             "admin/income_statement.html",
-            {"report": report}
+            {"report": report, "generated_at": timezone.now()},
         ).content.decode("utf-8")
 
         # Convert to PDF
@@ -467,78 +485,137 @@ class ReportAdmin(admin.ModelAdmin):
 
         # Return PDF as response
         response = HttpResponse(pdf, content_type="application/pdf")
-        filename = f"income_statement_{report.id}.pdf"
+        filename = f"""{report.open_date.strftime('%Y-%m-%d')} - {report.close_date.strftime('%Y-%m-%d')} Income Statement: Generated ({timezone.now().strftime('%Y-%m-%d %H:%M:%S')}).pdf"""
+        response["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+    
+    def open_balance_sheet(self, request, object_id, *args, **kwargs):
+        report = get_object_or_404(Report, pk=object_id)
+        # Render HTML template
+        html_content = render(
+            request,
+            "admin/balance_sheet.html",
+            {"report": report, "balance_type": "Opening"}
+        ).content.decode("utf-8")
+
+        # Convert to PDF
+        pdf = HTML(string=html_content).write_pdf()
+
+        # Return PDF as response
+        response = HttpResponse(pdf, content_type="application/pdf")
+        filename = f"opening_balance_sheet_{report.id}.pdf"
+        response["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+    
+    def close_balance_sheet(self, request, object_id, *args, **kwargs):
+        report = get_object_or_404(Report, pk=object_id)
+        # Render HTML template
+        html_content = render(
+            request,
+            "admin/balance_sheet.html",
+            {"report": report, "balance_type": "Closing"}
+        ).content.decode("utf-8")
+
+        # Convert to PDF
+        pdf = HTML(string=html_content).write_pdf()
+
+        # Return PDF as response
+        response = HttpResponse(pdf, content_type="application/pdf")
+        filename = f"closing_balance_sheet_{report.id}.pdf"
         response["Content-Disposition"] = f"attachment; filename={filename}"
         return response
 
 
-class LotMovementInline(admin.TabularInline):
-    model = LotMovement
+class BatchMovementInline(admin.TabularInline):
+    model = BatchMovement
     extra = 0
     fields = ('date', 'quantity')
     can_delete = False
     ordering = ('date',)
 
 
-@admin.register(Lot)
-class LotAdmin(admin.ModelAdmin):
+@admin.register(StockBatch)
+class BatchAdmin(admin.ModelAdmin):
     list_display = (
         'date', 
-        'purchase_item__product__name', 
-        'purchase_item__quantity', 
+        'product__name', 
+        'quantity', 
         'quantity_remaining', 
+        'unit_cost',
         'movements',
         'in_stock',
     )
     list_filter = ('date_received',)
-    search_fields = ('purchase_item__product__name',)
-    inlines = [LotMovementInline]
-    readonly_fields = ('quantity_remaining', 'is_empty')
+    search_fields = ('product__name',)
+    inlines = [BatchMovementInline]
+    readonly_fields = ('quantity_remaining', 'is_empty', 'unit_cost',)
     ordering = ('-date_received',)
-    list_filter = ('purchase_item__product__name',)
+
+    @admin.display(description='Product')
+    def product__name(self, obj: StockBatch):
+        return obj.linked_object.product.name
 
     @admin.display(description='Date Received')
-    def date(self, obj: Lot):
+    def date(self, obj: StockBatch):
         return obj.date_received.date()
 
     @admin.display(description='Quantity Received')
-    def purchase_item__quantity(self, obj: Lot):
-        return f"{obj.purchase_item.quantity:.2f} {obj.purchase_item.product.unit}"
+    def quantity(self, obj: StockBatch):
+        return f"{obj.linked_object.quantity:.2f} {obj.linked_object.product.unit}"
 
     @admin.display(description='Quantity Remaining')
-    def quantity_remaining(self, obj: Lot):
-        return f"{obj.quantity_remaining:.2f} {obj.purchase_item.product.unit}"
+    def quantity_remaining(self, obj: StockBatch):
+        return f"{obj.quantity_remaining:.2f} {obj.linked_object.product.unit}"
     
     @admin.display(description='In Stock', boolean=True)
-    def in_stock(self, obj: Lot):
+    def in_stock(self, obj: StockBatch):
         return not obj.is_empty
     
     @admin.display(description='Movements')
-    def movements(self, obj: Lot):
+    def movements(self, obj: StockBatch):
         return obj.movements.filter(
-            movement_type=LotMovement.MovementType.OUT
+            movement_type=BatchMovement.MovementType.OUT
         ).count()
+    
+    @admin.display(description='Unit Cost')
+    def unit_cost(self, obj: StockBatch):
+        return f"${obj.linked_object.unit_cost:.2f}"
 
 
-@admin.register(Cutting)
-class CuttingAdmin(admin.ModelAdmin):
-    list_display = (
-        'date', 
-        'lot__purchase_item__product__name', 
-        'weight_loss',
-        'unit_cost', 
-        'total_cost'
+@admin.register(StockConversion)
+class StockConversionAdmin(admin.ModelAdmin):
+    list_display = ('date', 'from_product', 'to_product', 'quantity', 'unit_cost')
+    list_filter = ('date',)
+    search_fields = ('from_product__name', 'to_product__name')
+
+    fieldsets = (
+        (None, {
+            'fields': ('date',)
+        }),
+        ('Products', {
+            'fields': ('from_product', 'to_product')
+        }),
+        ('Quantities', {
+            'fields': ('quantity', 'unit_cost')
+        }),
     )
-    list_filter = ('date', 'lot__purchase_item__product__name')
-    search_fields = ('lot__purchase_item__product__name',)
+
+
+@admin.register(StockAdjustment)
+class StockAdjustmentAdmin(admin.ModelAdmin):
+    list_display = ('date', 'product', 'quantity', 'unit_cost')
+    list_filter = ('date',)
+    search_fields = ('product__name',)
     ordering = ('-date',)
 
-    @admin.display(description='Weight loss')
-    def weight_loss(self, obj: Cutting):
-        return f"{obj.starting_weight - obj.ending_weight:.2f} {obj.lot.purchase_item.product.unit}"
-
-    @admin.display(description='Total Cost')
-    def total_cost(self, obj: Cutting):
-        weight_cost = obj.lot.purchase_item.unit_cost * (obj.starting_weight - obj.ending_weight)
-        cutting_cost = obj.unit_cost * obj.starting_weight
-        return f"${weight_cost + cutting_cost:.2f}"
+    fieldsets = (
+        (None, {
+            'fields': ('date',)
+        }),
+        ('Product', {
+            'fields': ('product',)
+        }),
+        ('Adjustment', {
+            'fields': ('quantity', 'unit_cost')
+        }),
+    )

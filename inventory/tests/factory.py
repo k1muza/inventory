@@ -1,6 +1,6 @@
 import factory
 
-from inventory.models import Lot, Product, Purchase, Sale, SaleItem
+from inventory.models import StockBatch, Product, Purchase, Sale, SaleItem
 
 class ProductFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -46,16 +46,8 @@ class SaleItemFactory(factory.django.DjangoModelFactory):
 
 
 
-class LotFactory(factory.django.DjangoModelFactory):
+class BatchFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = Lot
+        model = StockBatch
 
     purchase_item = factory.SubFactory(PurchaseItemFactory)
-
-
-class CuttingFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = 'inventory.Cutting'
-
-    lot = factory.SubFactory(LotFactory)
-    quantity = factory.Faker('random_int', min=1, max=100)

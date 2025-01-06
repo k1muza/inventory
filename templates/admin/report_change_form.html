@@ -1,10 +1,39 @@
 {% extends "admin/change_form.html" %}
 
 {% block object-tools-items %}
-    {{ block.super }}
-    {% if change %}
-        <li>
-            <a href="{% url 'admin:income-statement' object_id=original.pk %}" class="historylink">Income Statement</a>
-        </li>
-    {% endif %}
+{{ block.super }}
+{% if change %}
+<li>
+    <a href="{% url 'admin:income-statement' object_id=original.pk %}" class="historylink">Income Statement</a>
+    <a href="{% url 'admin:open-balance-sheet' object_id=original.pk %}" class="historylink">Opening Balance Sheet</a>
+    <a href="{% url 'admin:close-balance-sheet' object_id=original.pk %}" class="historylink">Closing Balance Sheet</a>
+</li>
+{% endif %}
+{% endblock %}
+
+{% block after_field_sets %}
+<!-- Perhaps your existing summary table(s) -->
+<h2>Inventory Balances</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th>Opening Stock Level</th>
+            <th>Closing Stock Level</th>
+            <th>Opening Stock Value</th>
+            <th>Closing Stock Value</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in original.inventory_balances %}
+        <tr>
+            <td>{{ row.product }}</td>
+            <td>{{ row.opening_stock_level|floatformat:2 }}</td>
+            <td>{{ row.closing_stock_level|floatformat:2 }}</td>
+            <td>{{ row.opening_stock_value|floatformat:2 }}</td>
+            <td>{{ row.closing_stock_value|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 {% endblock %}

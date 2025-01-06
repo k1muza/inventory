@@ -1,18 +1,19 @@
 import pytest
-from inventory.models import Lot, PurchaseItem
+from django.contrib.contenttypes.models import ContentType
+from inventory.models import StockBatch, PurchaseItem
 
 
 @pytest.mark.django_db
 def test_lot_creation_on_purchase_item(purchase_item_factory):
     purchase_item: PurchaseItem = purchase_item_factory()
-    assert Lot.objects.count() == 1
-    lot = Lot.objects.first()
-    assert lot.purchase_item == purchase_item
-    assert lot.date_received == purchase_item.purchase.date
+    assert StockBatch.objects.count() == 1
+    batch = StockBatch.objects.first()
+    assert batch.linked_object == purchase_item
+    assert batch.date_received == purchase_item.purchase.date
 
 
 @pytest.mark.django_db
-def test_lot_consumption_on_sale(
+def test_batch_consumption_on_sale(
     product_factory,
     purchase_item_factory, 
     sale_item_factory
@@ -20,8 +21,12 @@ def test_lot_consumption_on_sale(
     product = product_factory()
     purchase_item = purchase_item_factory(product=product, quantity=100)
     sale_item_factory(product=product, quantity=100)
-    assert purchase_item.lot.quantity_remaining == 0
-    assert purchase_item.lot.is_empty
+    batch = StockBatch.objects.get(
+        content_type=ContentType.objects.get_for_model(PurchaseItem),
+        object_id=purchase_item.id
+    )
+    assert batch.quantity_remaining == 0
+    assert batch.is_empty
 
 
 @pytest.mark.django_db
@@ -35,10 +40,10 @@ def test_lot_movements_on_sale(
     second = purchase_item_factory(product=product, quantity=50)
     third = purchase_item_factory(product=product, quantity=50)
     sale_item_factory(product=product, quantity=140)
-    assert first.lot.quantity_remaining == 0
-    assert second.lot.quantity_remaining == 0
-    assert third.lot.quantity_remaining == 10
-    assert not third.lot.is_empty
+    assert first.batch.quantity_remaining == 0
+    assert second.batch.quantity_remaining == 0
+    assert third.batch.quantity_remaining == 10
+    assert not third.batch.is_empty
 
 
 @pytest.mark.django_db
@@ -50,7 +55,7 @@ def test_lot_partial_consumption_on_sale(
     product = product_factory()
     purchase_item = purchase_item_factory(product=product, quantity=100)
     sale_item_factory(product=product, quantity=51)
-    assert purchase_item.lot.quantity_remaining == 49
+    assert purchase_item.batch.quantity_remaining == 49
 
 
 @pytest.mark.parametrize(
@@ -76,4 +81,4 @@ def test_lot_profit(
     product = product_factory()
     purchase_item = purchase_item_factory(product=product, quantity=quantity, unit_cost=cost_per_unit)
     sale_item_factory(product=product, quantity=quantity, unit_price=price_per_unit)
-    assert purchase_item.lot.profit == profit
+    assert purchase_item.batch.profit == profit

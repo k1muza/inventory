@@ -1,4 +1,4 @@
-from django.db.models import Sum, Q, F, DecimalField, ExpressionWrapper, FloatField, Case, When, Value
+from django.db.models import Sum, Q, F, DecimalField, ExpressionWrapper, Case, When, Value
 from django.db.models.functions import Coalesce
 import pandas as pd
 from decimal import Decimal
@@ -56,7 +56,7 @@ class Predictor:
                 final_quantity=Case(
                     When(net_stock__lt=F('quantity'), then=Value(None)),  # limited by stock => None
                     default=F('quantity'),  # not limited => keep the original quantity
-                    output_field=FloatField()  # or DecimalField
+                    output_field=DecimalField(decimal_places=3)  # or DecimalField
                 )
             )
         )

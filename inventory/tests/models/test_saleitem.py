@@ -32,7 +32,7 @@ def test_saleitem_profit(
         quantity=quantity, 
         unit_price=unit_price
     )
-    # assert sale_item.profit == profit
+    assert sale_item.profit == profit
 
 
 @pytest.mark.parametrize(
@@ -99,4 +99,4 @@ def test_saleitem_profit_multiple_movements(
         quantity=sale_quantity, 
         unit_price=unit_price
     )
-    # assert sale_item.profit == profit
+    assert sale_item.profit == profit

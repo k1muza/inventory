@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django import forms
 
-from inventory.models import Lot
+from inventory.models import StockBatch
 
 class StockAdjustmentForm(forms.Form):
     stock_data = forms.CharField(
@@ -72,38 +72,4 @@ class PurchasesForm(forms.Form):
         required=False,
         label='Create Missing Products',
         help_text='Create products that do not exist in the database.'
-    )
-
-
-class CuttingForm(forms.Form):
-    lot = forms.ModelChoiceField(
-        queryset=Lot.objects.order_by('-date_received'),
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label='Select Lot'
-    )
-    quantity = forms.DecimalField(
-        max_digits=10, 
-        decimal_places=3,
-        widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        label='Quantity'
-    )
-    quantity_reduction = forms.DecimalField(
-        max_digits=10, 
-        decimal_places=3,
-        widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        label='Reduction in Quantity'
-    )
-    unit_cost = forms.DecimalField(
-        max_digits=15, 
-        decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        label='Cost'
-    )
-    date = forms.DateField(
-        widget=forms.DateInput(attrs={
-            'class': 'form-control',
-            'type': 'date'
-        }),
-        label='Cutting Date',
-        initial=timezone.now().strftime('%Y-%m-%d')
     )

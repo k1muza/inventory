@@ -5,8 +5,8 @@ import re
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.db import transaction
-from .models import Cutting, Product, Purchase, Sale, StockMovement
-from .forms import CuttingForm, PurchasesForm, SalesForm, StockAdjustmentForm
+from .models import Product, Purchase, Sale, StockMovement
+from .forms import PurchasesForm, SalesForm, StockAdjustmentForm
 
 @transaction.atomic
 def stock_new(request):
@@ -110,7 +110,7 @@ def sales_form(request):
                 # e.g. "4.365" or "11.295"
                 quantity_str = line[1].strip()
                 try:
-                    quantity = float(quantity_str)
+                    quantity = Decimal(quantity_str)
                 except ValueError:
                     errors.append(f"Invalid quantity '{quantity_str}' for line: {line}")
                     continue
@@ -194,34 +194,3 @@ def purchases_form(request):
         
     form = PurchasesForm()
     return render(request, 'inventory/purchase_form.html', {'form': form})
-
-
-def cutting_new(request):
-    if request.method == 'POST':
-        form = CuttingForm(request.POST)
-        if form.is_valid():
-            # Extract cleaned data
-            lot = form.cleaned_data['lot']
-            quantity_reduction = form.cleaned_data['quantity_reduction']
-            quantity = form.cleaned_data['quantity']
-            unit_cost = form.cleaned_data['unit_cost']
-            date = form.cleaned_data['date']
-
-            # Create and save the Cutting instance
-            Cutting.objects.create(
-                lot=lot,
-                quantity=quantity,
-                quantity_reduction=quantity_reduction,
-                unit_cost=unit_cost,
-                date=date
-            )
-
-            messages.success(request, "Cutting record created successfully!")
-            return redirect('cutting_list')  # Adjust redirect to an appropriate view
-        else:
-            # Form invalid, show errors
-            messages.error(request, "Please correct the errors below.")
-    else:
-        form = CuttingForm()
-
-    return render(request, 'inventory/cutting_form.html', {'form': form})

@@ -16,6 +16,7 @@
 <body>
   <h1>Income Statement</h1>
   <p>Period: {{ report.open_date|date:"Y-m-d" }} to {{ report.close_date|date:"Y-m-d" }}</p>
+  <p>Generated on: {{ generated_at|date:"Y-m-d H:i:s" }}</p>
 
   <table>
     <thead>
