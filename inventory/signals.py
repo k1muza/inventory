@@ -69,9 +69,7 @@ def on_sale_item_save(sender, instance: SaleItem, created, **kwargs):
             date=instance.sale.date,
         )
     )
-    Transaction.objects.get_or_create(
-        content_type=purchase_ct,
-        object_id=instance.id,
+    instance.transactions.update_or_create(
         defaults=dict(
             date=instance.sale.date,
             transaction_type='SALE',
@@ -87,19 +85,14 @@ def on_sale_item_delete(sender, instance: SaleItem, **kwargs):
         content_type=saleitem_ct,
         object_id=instance.id,
     ).delete()
-    Transaction.objects.filter(
-        content_type=saleitem_ct,
-        object_id=instance.id,
-    ).delete()
-    BatchMovement.objects.filter(
-        content_type=saleitem_ct,
-        object_id=instance.id,
-    ).delete()
+    instance.transactions.all().delete()
+    instance.movements.all().delete()
 
 
 @receiver(post_save, sender=SaleItem)
 @transaction.atomic
 def consume_batches(sender, instance: SaleItem, created, **kwargs):
+    instance.movements.all().delete()
     try:
         instance.product.consume(instance.quantity, instance)
     except ValueError as e:

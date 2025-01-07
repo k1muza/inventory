@@ -225,6 +225,20 @@ class Product(models.Model):
         stock_out = self.stock_movements.filter(movement_type='OUT', date__lte=date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_in - stock_out
     
+    def get_incoming_stock(self, start_date, end_date):
+        """
+        Calculate stock increase between two dates.
+        """
+        stock_in = self.stock_movements.filter(movement_type='IN', date__gt=start_date, date__lte=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
+        return stock_in
+    
+    def get_outgoing_stock(self, start_date, end_date):
+        """
+        Calculate stock decrease between two dates.
+        """
+        stock_out = self.stock_movements.filter(movement_type='OUT', date__gt=start_date, date__lte=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
+        return stock_out
+    
     def get_stock_value(self, date):
         """
         Calculate stock value at a specific date.

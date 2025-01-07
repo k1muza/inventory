@@ -13,6 +13,7 @@ class SaleItem(models.Model):
     unit_price = models.DecimalField(max_digits=15, decimal_places=2)
 
     movements = GenericRelation('inventory.BatchMovement', related_query_name='sale_item')
+    transactions = GenericRelation('inventory.Transaction', related_query_name='sale_item')
 
     def __str__(self):
         return f"{self.product.name} - {self.sale.date.strftime('%Y-%m-%d')} - {self.quantity} x {self.unit_price}"

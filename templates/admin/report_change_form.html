@@ -19,6 +19,8 @@
         <tr>
             <th>Product</th>
             <th>Opening Stock Level</th>
+            <th>Incoming Stock</th>
+            <th>Outgoing Stock</th>
             <th>Closing Stock Level</th>
             <th>Opening Stock Value</th>
             <th>Closing Stock Value</th>
@@ -27,11 +29,13 @@
     <tbody>
         {% for row in original.inventory_balances %}
         <tr>
-            <td>{{ row.product }}</td>
-            <td>{{ row.opening_stock_level|floatformat:2 }}</td>
-            <td>{{ row.closing_stock_level|floatformat:2 }}</td>
-            <td>{{ row.opening_stock_value|floatformat:2 }}</td>
-            <td>{{ row.closing_stock_value|floatformat:2 }}</td>
+            <td>{{ row.product.name }}</td>
+            <td>{{ row.opening_stock_level|floatformat:3 }} {{row.product.unit}}</td>
+            <td>{{ row.incoming_stock|floatformat:3 }} {{row.product.unit}}</td>
+            <td>{{ row.outgoing_stock|floatformat:3 }} {{row.product.unit}}</td>
+            <td>{{ row.closing_stock_level|floatformat:3 }} {{row.product.unit}}</td>
+            <td>${{ row.opening_stock_value|floatformat:2 }}</td>
+            <td>${{ row.closing_stock_value|floatformat:2 }}</td>
         </tr>
         {% endfor %}
     </tbody>
