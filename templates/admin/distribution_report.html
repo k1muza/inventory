@@ -1,0 +1,83 @@
+{% load custom_filters %}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Stock Distribution</title>
+    <style>
+    body {
+        font-family: sans-serif;
+    }
+    h1 {
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+    table {
+        width:100%;
+        border-collapse: collapse;
+        margin-top:20px;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding:8px;
+    }
+    th {
+        background: #f4f4f4;
+        font-size: 13px;
+    }
+    td {
+        font-size: 11px;
+    }
+    </style>
+</head>
+<body>
+    <h1>Inventory and Profitability Report</h1>
+    <p>
+        <small>
+            From {{report.open_date|date:"Y-m-d"}} to {{report.close_date|date:"Y-m-d"}}
+        </small>
+    </p>
+    <p>
+        <small>
+            Report generated at: {{ generated_at|date:"Y-m-d H:i" }}
+        </small>
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Opening Stock</th>
+                <th>Incoming Stock</th>
+                <th>Outgoing Stock</th>
+                <th>Closing Stock</th>
+                <th>Sales</th>
+                <th>COGS</th>
+                <th>Gross Profit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in report.inventory_balances|dictsortreversed:"gross_profit" %}
+            <tr>
+                <td>{{ row.product.name }}</td>
+                <td>{{ row.opening_stock_level|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
+                <td>{{ row.incoming_stock|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
+                <td>{{ row.outgoing_stock|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
+                <td>{{ row.closing_stock_level|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
+                <td>${{ row.sales|floatformat:2 }}</td>
+                <td>${{ row.cost_of_goods_sold|floatformat:2 }}</td>
+                <td><b>${{ row.gross_profit|floatformat:2 }}</b></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">No product stock found in report.</td>
+            </tr>
+            {% endfor %}
+            <tr>
+                <td>Total <strong>${{total|floatformat:2}}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

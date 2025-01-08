@@ -216,6 +216,7 @@ class Report(models.Model):
             })
         return inventory
     
+    # TODO: Resolve how conversions affect the profitability report
     @property
     def inventory_balances(self):
         """
@@ -229,13 +230,17 @@ class Report(models.Model):
         from inventory.models import Product
         inventory = []
         for product in Product.objects.all():
-            inventory.append({
-                'product': product,
-                'opening_stock_level': product.get_stock_level(self.open_date),
-                'closing_stock_level': product.get_stock_level(self.close_date),
-                'opening_stock_value': product.get_stock_value(self.open_date),
-                'closing_stock_value': product.get_stock_value(self.close_date),
-                'incoming_stock': product.get_incoming_stock(self.open_date, self.close_date),
-                'outgoing_stock': product.get_outgoing_stock(self.open_date, self.close_date),
-            })
+            if product.get_stock_level(self.open_date) or product.get_stock_level(self.close_date):
+                inventory.append({
+                    'product': product,
+                    'opening_stock_level': product.get_stock_level(self.open_date),
+                    'closing_stock_level': product.get_stock_level(self.close_date),
+                    'opening_stock_value': product.get_stock_value(self.open_date),
+                    'closing_stock_value': product.get_stock_value(self.close_date),
+                    'incoming_stock': product.get_incoming_stock(self.open_date, self.close_date),
+                    'outgoing_stock': product.get_outgoing_stock(self.open_date, self.close_date),
+                    'sales': product.get_total_sales(self.open_date, self.close_date),
+                    'cost_of_goods_sold': product.get_cost_of_goods_sold(self.open_date, self.close_date),
+                    'gross_profit': product.get_gross_profit(self.open_date, self.close_date),
+                })
         return inventory

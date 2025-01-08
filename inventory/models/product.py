@@ -199,7 +199,6 @@ class Product(models.Model):
 
         return total_cost / total_quantity if total_quantity > 0 else Decimal('0.0')
 
-
     @property
     def average_gross_profit(self):
         # Define the time window: now minus 7 days
@@ -221,22 +220,22 @@ class Product(models.Model):
         """
         Calculate stock level at a specific date.
         """
-        stock_in = self.stock_movements.filter(movement_type='IN', date__lte=date).aggregate(total=models.Sum('quantity'))['total'] or 0
-        stock_out = self.stock_movements.filter(movement_type='OUT', date__lte=date).aggregate(total=models.Sum('quantity'))['total'] or 0
+        stock_in = self.stock_movements.filter(movement_type='IN', date__lt=date).aggregate(total=models.Sum('quantity'))['total'] or 0
+        stock_out = self.stock_movements.filter(movement_type='OUT', date__lt=date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_in - stock_out
     
     def get_incoming_stock(self, start_date, end_date):
         """
         Calculate stock increase between two dates.
         """
-        stock_in = self.stock_movements.filter(movement_type='IN', date__gt=start_date, date__lte=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
+        stock_in = self.stock_movements.filter(movement_type='IN', date__gte=start_date, date__lt=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_in
     
     def get_outgoing_stock(self, start_date, end_date):
         """
         Calculate stock decrease between two dates.
         """
-        stock_out = self.stock_movements.filter(movement_type='OUT', date__gt=start_date, date__lte=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
+        stock_out = self.stock_movements.filter(movement_type='OUT', date__gte=start_date, date__lt=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_out
     
     def get_stock_value(self, date):
@@ -246,7 +245,7 @@ class Product(models.Model):
         total_value = Decimal('0.0')
 
         for batch in self.batches:
-            if batch.date_received <= date:
+            if batch.date_received < date:
                 qty = batch.get_quantity_remaining(date)
                 cost = batch.unit_cost
                 total_value += (qty * cost)
@@ -272,4 +271,49 @@ class Product(models.Model):
 
         if remaining > 0.001:
             raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
+        
+    def get_total_purchases(self, start_date, end_date):
+        """
+        Get all purchase items between two dates.
+        """
+        return self.purchase_items.filter(
+                purchase__date__range=[start_date, end_date]
+            ).annotate(
+                line_total=ExpressionWrapper(
+                    F('quantity') * F('unit_cost'),
+                    output_field=DecimalField(max_digits=10, decimal_places=3)
+                )
+            ).aggregate(total=models.Sum('line_total'))['total'] or 0
+
+    def get_gross_profit(self, start_date, end_date):
+        """
+        Calculate gross profit 
+        Sales - Cost of goods sold (opening stock value + purchases - closing stock value)
+        """
+        sales = self.get_total_sales(start_date, end_date)
+        cost_of_goods_sold = self.get_cost_of_goods_sold(start_date, end_date)
+        
+        return sales - cost_of_goods_sold
     
+    def get_total_sales(self, start_date, end_date):
+        """
+        Get all sale items between two dates.
+        """
+        return self.sale_items.filter(
+                sale__date__range=[start_date, end_date]
+            ).annotate(
+                line_total=ExpressionWrapper(
+                    F('quantity') * F('unit_price'),
+                    output_field=DecimalField(max_digits=10, decimal_places=3)
+                )
+            ).aggregate(total=models.Sum('line_total'))['total'] or 0
+    
+    def get_cost_of_goods_sold(self, start_date, end_date):
+        """
+        Get cost of goods sold between two dates
+        """
+        opening_stock_value = self.get_stock_value(start_date)
+        closing_stock_value = self.get_stock_value(end_date)
+        purchases = self.get_total_purchases(start_date, end_date)
+        
+        return opening_stock_value + purchases - closing_stock_value

@@ -159,12 +159,12 @@ def purchases_form(request):
                 quantity_str = line[1].strip()
                 match = re.match(r'(\d+(\.\d+)?)', quantity_str)
                 if match:
-                    quantity = float(match.group(1))
+                    quantity = Decimal(match.group(1))
                 else:
                     messages.error(request, f"Invalid quantity: {quantity_str}")
                     raise ValueError(f"Bad quantity format: {quantity_str}")
                 
-                purchase_price = float(line[2].replace('$', '').strip())
+                purchase_price = Decimal(line[2].replace('$', '').strip())
 
                 try:
                     product = Product.objects.get(name__iexact=product_name)

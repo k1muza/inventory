@@ -7,6 +7,7 @@
     <a href="{% url 'admin:income-statement' object_id=original.pk %}" class="historylink">Income Statement</a>
     <a href="{% url 'admin:open-balance-sheet' object_id=original.pk %}" class="historylink">Opening Balance Sheet</a>
     <a href="{% url 'admin:close-balance-sheet' object_id=original.pk %}" class="historylink">Closing Balance Sheet</a>
+    <a href="{% url 'admin:distribution-report' object_id=original.pk %}" class="historylink">Profitability Report</a>
 </li>
 {% endif %}
 {% endblock %}
@@ -24,6 +25,7 @@
             <th>Closing Stock Level</th>
             <th>Opening Stock Value</th>
             <th>Closing Stock Value</th>
+            <th>Gross Profit</th>
         </tr>
     </thead>
     <tbody>
@@ -36,6 +38,7 @@
             <td>{{ row.closing_stock_level|floatformat:3 }} {{row.product.unit}}</td>
             <td>${{ row.opening_stock_value|floatformat:2 }}</td>
             <td>${{ row.closing_stock_value|floatformat:2 }}</td>
+            <td>${{ row.gross_profit|floatformat:2 }}</td>
         </tr>
         {% endfor %}
     </tbody>

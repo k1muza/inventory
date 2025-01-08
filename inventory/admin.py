@@ -122,11 +122,11 @@ class ProductAdmin(admin.ModelAdmin):
 
     @admin.display(description="Stock Level")
     def stock_level(self, obj: Product):
-        return f"{obj.stock_level:.2f} {obj.unit}"
+        return f"{obj.stock_level:.3f} {obj.unit}"
     
     @admin.display(description="Batch Level")
     def batch_level(self, obj: Product):
-        return f"{obj.batch_based_stock_level:.2f} {obj.unit}"
+        return f"{obj.batch_based_stock_level:.3f} {obj.unit}"
     
     @admin.display(description="Stock Value")
     def stock_value(self, obj: Product):
@@ -138,11 +138,11 @@ class ProductAdmin(admin.ModelAdmin):
     
     @admin.display(description="Av Consumption/Day")
     def average_consumption(self, obj: Product):
-        return f"{obj.average_consumption:.2f} {obj.unit}"
+        return f"{obj.average_consumption:.3f} {obj.unit}"
     
     @admin.display(description="Av Unit Cost")
     def average_unit_cost(self, obj: Product):
-        return f"${obj.average_unit_cost}"
+        return f"${obj.average_unit_cost:.2f}"
     
     @admin.display(description="Av Profit/Day")
     def average_gross_profit(self, obj: Product):
@@ -150,7 +150,7 @@ class ProductAdmin(admin.ModelAdmin):
     
     @admin.display(description="Days to Sell Out")
     def days_to_sell_out(self, obj: Product):
-        return f"{obj.days_until_stockout:.2f} days"
+        return f"{obj.days_until_stockout:.1f} days"
 
     def get_urls(self):
         urls = super().get_urls()
@@ -468,6 +468,11 @@ class ReportAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.close_balance_sheet),
                 name='close-balance-sheet',
             ),
+            path(
+                '<int:object_id>/distribution-report/',
+                self.admin_site.admin_view(self.distribution_report),
+                name='distribution-report',
+            )
         ]
         return custom_urls + urls
 
@@ -525,7 +530,28 @@ class ReportAdmin(admin.ModelAdmin):
         response["Content-Disposition"] = f"attachment; filename={filename}"
         return response
 
+    def distribution_report(self, request, object_id, *args, **kwargs):
+        report = get_object_or_404(Report, pk=object_id)
+        # Render HTML template
+        html_content = render(
+            request,
+            "admin/distribution_report.html",
+            {
+                "report": report, 
+                "generated_at": timezone.now(),
+                "total": sum(i['gross_profit'] for i in report.inventory_balances)
+            }
+        ).content.decode("utf-8")
 
+        # Convert to PDF
+        pdf = HTML(string=html_content).write_pdf()
+
+        # Return PDF as response
+        response = HttpResponse(pdf, content_type="application/pdf")
+        filename = f"Inventory and Profitability Report {report.id}.pdf"
+        response["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+    
 class BatchMovementInline(admin.TabularInline):
     model = BatchMovement
     extra = 0

@@ -114,7 +114,7 @@ class StockBatch(models.Model):
             date = timezone.now()
             
         total_in = self.movements.filter(
-            date__lte=date,
+            date__lt=date,
             movement_type=BatchMovement.MovementType.IN
         ).aggregate(
             total=Coalesce(Sum('quantity'), Decimal(0.0))
@@ -122,7 +122,7 @@ class StockBatch(models.Model):
 
         # Sum all 'OUT' movements prior to or at `date`
         total_out = self.movements.filter(
-            date__lte=date,
+            date__lt=date,
             movement_type=BatchMovement.MovementType.OUT
         ).aggregate(
             total=Coalesce(Sum('quantity'), Decimal(0.0))
