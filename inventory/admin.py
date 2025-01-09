@@ -158,6 +158,7 @@ class ProductAdmin(admin.ModelAdmin):
             path('<int:object_id>/sales-report/', self.admin_site.admin_view(self.sales_report), name='product-sales-report'),
             path('<int:object_id>/download-pdf/', self.admin_site.admin_view(self.download_pdf), name='product-download-pdf'),
             path('suggest-budget/', self.admin_site.admin_view(self.suggest_budget_view), name='product-suggest-budget'),
+            path('sales-graph/', self.admin_site.admin_view(self.sales_graph), name='product-sales-graph'),
         ]
         return custom_urls + urls
 
@@ -247,6 +248,24 @@ class ProductAdmin(admin.ModelAdmin):
         }
 
         return render(request, 'admin/product_sales_report.html', context)
+    
+    def sales_graph(self, request):
+        products = Product.objects.filter(unit='kg')
+        line = []
+        for p in products:
+            line.append({
+                'name': p.name,
+                'sales': list(p.sale_items.all().order_by('sale__date').values(
+                    'sale__date',
+                    'quantity',
+                ))
+            })
+
+        context = {
+            'products': line,
+        }
+
+        return render(request, 'admin/product_sales_graph.html', context)
 
 
 class PurchaseItemInline(admin.TabularInline):

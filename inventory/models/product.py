@@ -9,8 +9,6 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 
-from inventory.models.stock_batch import StockBatch
-
 
 class Product(models.Model):
     supplier = models.ForeignKey('inventory.Supplier', on_delete=models.SET_NULL, null=True, blank=True)
@@ -291,9 +289,10 @@ class Product(models.Model):
         Sales - Cost of goods sold (opening stock value + purchases - closing stock value)
         """
         sales = self.get_total_sales(start_date, end_date)
+        conversion_out = self.get_conversions_out(start_date, end_date)
         cost_of_goods_sold = self.get_cost_of_goods_sold(start_date, end_date)
         
-        return sales - cost_of_goods_sold
+        return sales + conversion_out - cost_of_goods_sold
     
     def get_total_sales(self, start_date, end_date):
         """
@@ -315,5 +314,32 @@ class Product(models.Model):
         opening_stock_value = self.get_stock_value(start_date)
         closing_stock_value = self.get_stock_value(end_date)
         purchases = self.get_total_purchases(start_date, end_date)
+        conversions_in = self.get_conversions_in(start_date, end_date)
         
-        return opening_stock_value + purchases - closing_stock_value
+        return opening_stock_value + purchases + conversions_in - closing_stock_value
+
+    def get_conversions_out(self, start_date, end_date):
+        """
+        Get all stock conversions in between two dates.
+        """
+        return self.conversions_from.filter(
+            date__range=[start_date, end_date],
+        ).annotate(
+            line_total=ExpressionWrapper(
+                F('quantity') * F('unit_cost'),
+                output_field=DecimalField(max_digits=10, decimal_places=3)
+            )
+        ).aggregate(total=models.Sum('line_total'))['total'] or 0
+    
+    def get_conversions_in(self, start_date, end_date):
+        """
+        Get all stock conversions in between two dates.
+        """
+        return self.conversions.filter(
+            date__range=[start_date, end_date],
+        ).annotate(
+            line_total=ExpressionWrapper(
+                F('quantity') * F('unit_cost'),
+                output_field=DecimalField(max_digits=10, decimal_places=3)
+            )
+        ).aggregate(total=models.Sum('line_total'))['total'] or 0
