@@ -98,10 +98,10 @@ def sales_form(request):
                 match = re.search(r'\((.*?)\)', raw_product_name)
                 if match:
                     # Convert bracketed text to float
-                    selling_price = float(match.group(1))
+                    selling_price = Decimal(match.group(1))
                 else:
                     # If there's no bracket, set a default or handle error
-                    selling_price = 0.0
+                    selling_price = Decimal(0.0)
 
                 # 2. Remove the (price) part from the product name
                 product_name = re.sub(r'\(.*?\)', '', raw_product_name).strip()

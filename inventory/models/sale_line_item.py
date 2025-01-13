@@ -10,7 +10,7 @@ class SaleItem(models.Model):
     sale = models.ForeignKey('inventory.Sale', related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey('inventory.Product', on_delete=models.CASCADE, related_name='sale_items')
     quantity = models.DecimalField(decimal_places=3, max_digits=15)
-    unit_price = models.DecimalField(max_digits=15, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=15, decimal_places=6)
 
     movements = GenericRelation('inventory.BatchMovement', related_query_name='sale_item')
     transactions = GenericRelation('inventory.Transaction', related_query_name='sale_item')

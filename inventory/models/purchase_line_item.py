@@ -9,7 +9,7 @@ class PurchaseItem(models.Model):
     purchase = models.ForeignKey('inventory.Purchase', related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey('inventory.Product', on_delete=models.CASCADE, related_name='purchase_items')
     quantity = models.DecimalField(decimal_places=3, max_digits=15)
-    unit_cost = models.DecimalField(max_digits=15, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=15, decimal_places=6)
 
     batches = GenericRelation('inventory.StockBatch', related_query_name='purchase_item')
 

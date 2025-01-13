@@ -59,7 +59,7 @@ def on_purchase_item_delete(sender, instance: PurchaseItem, **kwargs):
 @receiver(post_save, sender=SaleItem)
 def on_sale_item_save(sender, instance: SaleItem, created, **kwargs):
     purchase_ct = ContentType.objects.get_for_model(SaleItem)
-    StockMovement.objects.get_or_create(
+    StockMovement.objects.update_or_create(
         content_type=purchase_ct,
         object_id=instance.id,
         defaults=dict(

@@ -1,4 +1,3 @@
-from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from django.db.models import F, ExpressionWrapper, DecimalField
@@ -15,7 +14,14 @@ class Sale(models.Model):
     
     @property
     def total_amount(self):
-        return sum(item.unit_price*item.quantity for item in self.items.all())
+        return self.items.annotate(
+            line_total=ExpressionWrapper(
+                F('unit_price') * F('quantity'),
+                output_field=DecimalField(max_digits=10, decimal_places=3)
+            )
+        ).aggregate(
+            total_revenue=Sum('line_total')
+        )['total_revenue'] or 0
     
     @property
     def movements(self):
@@ -74,16 +80,8 @@ class Sale(models.Model):
         
     @property
     def gross_profit(self):
-        total_revenue = Decimal('0.0')
-        for movement in self.movements.all():
-            # Check if movement.linked_object is a SaleItem
-            if movement.linked_object and type(movement.linked_object).__name__ == 'SaleItem':
-                sale_item = movement.linked_object
-                total_revenue += (movement.quantity * sale_item.unit_price)
-
-        return total_revenue - self.cost_of_goods_sold
+        return self.total_amount - self.cost_of_goods_sold
     
     @property
     def gross_margin(self):
         return self.gross_profit / self.total_amount if self.total_amount else 0
-

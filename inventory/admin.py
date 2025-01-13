@@ -350,7 +350,7 @@ class SaleAdmin(admin.ModelAdmin):
     )
     
     @admin.display(description='Total Amount')
-    def total_amount(self, obj):
+    def total_amount(self, obj: Sale):
         return f"${obj.total_amount:.2f}"
     
     @admin.display(description='Cost of Goods Sold')
@@ -570,7 +570,8 @@ class ReportAdmin(admin.ModelAdmin):
         filename = f"Inventory and Profitability Report {report.id}.pdf"
         response["Content-Disposition"] = f"attachment; filename={filename}"
         return response
-    
+
+  
 class BatchMovementInline(admin.TabularInline):
     model = BatchMovement
     extra = 0

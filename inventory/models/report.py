@@ -230,7 +230,10 @@ class Report(models.Model):
         from inventory.models import Product
         inventory = []
         for product in Product.objects.all():
-            if product.get_stock_level(self.open_date) or product.get_stock_level(self.close_date):
+            if product.get_stock_level(self.open_date) or \
+                product.get_stock_level(self.close_date) or \
+                product.get_outgoing_stock(self.open_date, self.close_date) or \
+                product.get_incoming_stock(self.open_date, self.close_date):
                 inventory.append({
                     'product': product,
                     'opening_stock_level': product.get_stock_level(self.open_date),
