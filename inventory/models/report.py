@@ -31,6 +31,7 @@ class Report(models.Model):
     def cost_of_goods_sold(self):
         return self.opening_stock_value + self.total_purchases - self.closing_stock_value
     
+    
     @property
     def total_expenses(self):
         from inventory.models import Expense
@@ -175,6 +176,21 @@ class Report(models.Model):
             elif transaction.transaction_type == 'ADJUSTMENT':
                 total_cash += transaction.amount
         return total_cash
+    
+    @property
+    def expenses(self):
+        """
+        Return a list of dicts, each containing:
+            - description
+            - amount
+            - category
+
+        This implementation pushes the grouping and summing of expenses into the database.
+        """
+        from inventory.models import Expense
+        qs = Expense.objects.filter(date__range=[self.open_date, self.close_date])
+        # Group by description and category, and sum the amount for each group.
+        return qs.values('description', 'category').annotate(amount=Sum('amount')).values('description', 'amount').order_by('-amount')
     
     @property
     def opening_inventory(self):

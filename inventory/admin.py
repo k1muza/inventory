@@ -101,12 +101,12 @@ class ProductAdmin(admin.ModelAdmin):
         'average_unit_cost',
         'is_below_minimum_stock',
     )
-    list_filter = ('unit',)
+    list_filter = ('unit', 'is_active')
     search_fields = ('name',)
     inlines = [StockMovementInline]
     fieldsets = (
         (None, {
-            'fields': ('name', 'unit', 'batch_size', 'predict_demand')
+            'fields': ('name', 'unit', 'batch_size', 'predict_demand', 'is_active')
         }),
         ('Pricing', {
             'fields': ('purchase_price', 'selling_price')
@@ -330,6 +330,7 @@ class SaleAdmin(admin.ModelAdmin):
     list_filter = ('date',)
     search_fields = ('notes',)
     readonly_fields = ('total_amount', 'cost_of_goods_sold', 'gross_profit', 'gross_margin')
+    ordering = ['-date']
 
     fieldsets = (
         (None, {
@@ -633,6 +634,7 @@ class StockConversionAdmin(admin.ModelAdmin):
     list_display = ('date', 'from_product', 'to_product', 'quantity', 'unit_cost')
     list_filter = ('date',)
     search_fields = ('from_product__name', 'to_product__name')
+    ordering = ('-date',)
 
     fieldsets = (
         (None, {

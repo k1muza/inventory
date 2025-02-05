@@ -1,5 +1,6 @@
 import csv
 from decimal import Decimal
+import decimal
 from io import StringIO
 import re
 from django.shortcuts import render, redirect
@@ -113,7 +114,10 @@ def sales_form(request):
                     quantity = Decimal(quantity_str)
                 except ValueError:
                     errors.append(f"Invalid quantity '{quantity_str}' for line: {line}")
-                    continue
+                    raise ValueError(f"Bad quantity format: {quantity_str}")
+                except decimal.InvalidOperation:
+                    errors.append(f"Invalid quantity '{quantity_str}' for line: {line}")
+                    raise ValueError(f"Bad quantity format: {quantity_str}")
 
                 try:
                     product = Product.objects.get(name__iexact=product_name)
