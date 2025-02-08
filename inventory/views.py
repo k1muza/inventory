@@ -177,7 +177,7 @@ def purchases_form(request):
                         product = Product.objects.create(
                             name=product_name, 
                             unit_cost=purchase_price,
-                            selling_price=0,
+                            unit_price=None,
                             unit='unit'
                         )
                     else:
