@@ -131,3 +131,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom settings
 AVERAGE_INTERVAL_DAYS = 7
 REORDER_INTERVAL_DAYS = 7
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
