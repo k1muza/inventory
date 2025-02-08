@@ -40,8 +40,8 @@ def stock_new(request):
                     if create_missing_products:
                         product = Product.objects.create(
                             name=product_name, 
-                            purchase_price=purchase_price,
-                            selling_price=selling_price,
+                            unit_cost=purchase_price,
+                            unit_price=selling_price,
                             unit=unit
                         )
                     else:
@@ -176,7 +176,7 @@ def purchases_form(request):
                     if create_missing_products:
                         product = Product.objects.create(
                             name=product_name, 
-                            purchase_price=purchase_price,
+                            unit_cost=purchase_price,
                             selling_price=0,
                             unit='unit'
                         )

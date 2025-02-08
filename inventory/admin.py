@@ -83,7 +83,7 @@ class ProductAdmin(admin.ModelAdmin):
 
     list_display = (
         'name', 
-        'purchase_price',
+        'unit_cost',
         'average_unit_cost',
         'stock_level', 
         'batch_level',
@@ -109,7 +109,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('name', 'unit', 'batch_size', 'predict_demand', 'is_active')
         }),
         ('Pricing', {
-            'fields': ('purchase_price', 'selling_price')
+            'fields': ('unit_cost', 'unit_price')
         }),
         ('Stock Levels', {
             'fields': ('minimum_stock_level', 'average_consumption')

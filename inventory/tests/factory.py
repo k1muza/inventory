@@ -7,8 +7,8 @@ class ProductFactory(factory.django.DjangoModelFactory):
         model = Product
 
     name = factory.Faker('word')
-    selling_price = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True)
-    purchase_price = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True)
+    unit_price = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True)
+    unit_cost = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True)
 
 
 class PurchaseFactory(factory.django.DjangoModelFactory):
