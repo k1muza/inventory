@@ -15,6 +15,8 @@ class Product:
     unit_cost: typing.Optional[Decimal]
     minimum_stock_level: typing.Optional[int]
     unit: typing.Optional[str]
+    updated_at: typing.Optional[str]
+    created_at: typing.Optional[str]
 
 
 @strawberry_django.type(models.Purchase)
