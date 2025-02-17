@@ -199,7 +199,7 @@ class ProductAdmin(admin.ModelAdmin):
         return response
 
     def suggest_budget_view(self, request):
-        products = Product.objects.all()
+        products = Product.objects.filter(is_active=True)
         suggested_purchases = []
         total_reorder_cost = 0
         realizable_profit = 0
