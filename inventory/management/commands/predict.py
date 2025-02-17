@@ -9,7 +9,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         predictor = Predictor()
 
-        for product in Product.objects.filter(predict_demand=True):
+        for product in Product.objects.filter(predict_demand=True, is_active=True):
             forecasts = predictor.predict_sales(product)
             self.stdout.write(self.style.SUCCESS(f'Product: {product.name}'))
             for forecast in forecasts:
