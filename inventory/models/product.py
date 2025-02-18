@@ -293,10 +293,9 @@ class Product(models.Model):
         Sales - Cost of goods sold (opening stock value + purchases - closing stock value)
         """
         sales = self.get_total_sales(start_date, end_date)
-        conversion_out = self.get_conversions_out(start_date, end_date)
         cost_of_goods_sold = self.get_cost_of_goods_sold(start_date, end_date)
         
-        return sales + conversion_out - cost_of_goods_sold
+        return sales - cost_of_goods_sold
     
     def get_total_sales(self, start_date, end_date):
         """
@@ -319,8 +318,9 @@ class Product(models.Model):
         closing_stock_value = self.get_stock_value(end_date)
         purchases = self.get_total_purchases(start_date, end_date)
         conversions_in = self.get_conversions_in(start_date, end_date)
+        conversions_out = self.get_conversions_out(start_date, end_date)
         
-        return opening_stock_value + purchases + conversions_in - closing_stock_value
+        return opening_stock_value + purchases + conversions_in - closing_stock_value - conversions_out
 
     def get_conversions_out(self, start_date, end_date):
         """
