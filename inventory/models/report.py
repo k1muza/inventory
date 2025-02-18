@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from django.db.models import DecimalField, Sum, F, ExpressionWrapper
+from django.db.models import DecimalField, Sum, F, ExpressionWrapper, Case, When, Value
 
 
 class Report(models.Model):
@@ -158,18 +158,18 @@ class Report(models.Model):
         Calculate the total cash available at the start of the reporting period.
         This considers all transactions that occurred strictly before `open_date`.
         """
-        total_cash = 0
-        transactions = Transaction.objects.filter(date__lt=self.open_date)
-        for transaction in transactions:
-            if transaction.transaction_type == 'SALE':
-                total_cash += transaction.amount
-            elif transaction.transaction_type == 'PURCHASE':
-                total_cash -= transaction.amount
-            elif transaction.transaction_type == 'EXPENSE':
-                total_cash -= transaction.amount
-            elif transaction.transaction_type == 'ADJUSTMENT':
-                total_cash += transaction.amount
-        return total_cash
+        return Transaction.objects.filter(date__lt=self.open_date).aggregate(
+            total_cash=Sum(
+                Case(
+                    When(transaction_type='SALE', then=F('amount')),
+                    When(transaction_type='PURCHASE', then=-F('amount')),
+                    When(transaction_type='EXPENSE', then=-F('amount')),
+                    When(transaction_type='ADJUSTMENT', then=F('amount')),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                )
+            )
+        )['total_cash'] or 0
 
     @property
     def closing_cash(self):
@@ -178,18 +178,18 @@ class Report(models.Model):
         Calculate the total cash available at the end of the reporting period.
         This considers all transactions that occurred strictly before `close_date`.
         """
-        total_cash = 0
-        transactions = Transaction.objects.filter(date__lt=self.close_date)
-        for transaction in transactions:
-            if transaction.transaction_type == 'SALE':
-                total_cash += transaction.amount
-            elif transaction.transaction_type == 'PURCHASE':
-                total_cash -= transaction.amount
-            elif transaction.transaction_type == 'EXPENSE':
-                total_cash -= transaction.amount
-            elif transaction.transaction_type == 'ADJUSTMENT':
-                total_cash += transaction.amount
-        return total_cash
+        return Transaction.objects.filter(date__lt=self.close_date).aggregate(
+            total_cash=Sum(
+                Case(
+                    When(transaction_type='SALE', then=F('amount')),
+                    When(transaction_type='PURCHASE', then=-F('amount')),
+                    When(transaction_type='EXPENSE', then=-F('amount')),
+                    When(transaction_type='ADJUSTMENT', then=F('amount')),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                )
+            )
+        )['total_cash'] or 0
     
     @property
     def expenses(self):
