@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from django.db.models import DecimalField, Sum, F, ExpressionWrapper, Case, When, Value
+from django.db.models import DecimalField, Sum, F, ExpressionWrapper, Case, When, Value, Q
 
 
 class Report(models.Model):
@@ -70,126 +70,19 @@ class Report(models.Model):
     
     @property
     def opening_stock_value(self):
-        from inventory.models import StockBatch, BatchMovement
-        """
-        Calculates the total value of all lots' stock on hand 
-        as of self.open_date, using each lot's purchase cost.
-        """
-        total_value = Decimal(0.0)
-
-        for batch in StockBatch.objects.filter(date_received__lt=self.open_date):
-            total_in = batch.movements.filter(
-                date__lt=self.open_date,
-                movement_type=BatchMovement.MovementType.IN,
-            ).aggregate(
-                total=Coalesce(
-                    Sum(
-                        'quantity',
-                        output_field=DecimalField(max_digits=15, decimal_places=2)
-                    ),
-                    Decimal(0.0)
-                )
-            )['total']
-                
-            total_out = batch.movements.filter(
-                date__lt=self.open_date,
-                movement_type=BatchMovement.MovementType.OUT,
-            ).aggregate(
-                total=Coalesce(
-                    Sum(
-                        'quantity',
-                        output_field=DecimalField(max_digits=15, decimal_places=2)
-                    ),
-                    Decimal(0.0)
-                )
-            )['total']
-
-            net_qty = total_in - total_out
-            total_value += (net_qty * batch.linked_object.unit_cost)
-
-        return total_value
+        return self.get_stock_value_at(self.open_date)
     
     @property
     def closing_stock_value(self):
-        from inventory.models import StockBatch, BatchMovement
-        """
-        Calculates the total value of all lots' stock on hand 
-        as of self.close_date, using each lot's purchase cost.
-        """
-        total_value = Decimal(0.0)
-
-        for batch in StockBatch.objects.filter(date_received__lt=self.close_date):
-            queryset = batch.movements.filter(
-                date__lt=self.close_date,
-                movement_type=BatchMovement.MovementType.IN,
-            )
-            total_in = queryset.aggregate(
-                total=Coalesce(
-                    Sum(
-                        'quantity',
-                        output_field=DecimalField(max_digits=15, decimal_places=2)
-                    ),
-                    Decimal(0.0)
-                )
-            )['total']
-                
-            total_out = batch.movements.filter(
-                date__lt=self.close_date,
-                movement_type=BatchMovement.MovementType.OUT,
-            ).aggregate(
-                total=Coalesce(
-                    Sum(
-                        'quantity',
-                        output_field=DecimalField(max_digits=15, decimal_places=2)
-                    ),
-                    Decimal(0.0)
-                )
-            )['total']
-
-            net_qty = total_in - total_out
-            total_value += (net_qty * batch.linked_object.unit_cost)
-
-        return total_value
+        return self.get_stock_value_at(self.close_date)
     
     @property
     def opening_cash(self):
-        from inventory.models import Transaction
-        """
-        Calculate the total cash available at the start of the reporting period.
-        This considers all transactions that occurred strictly before `open_date`.
-        """
-        return Transaction.objects.filter(date__lt=self.open_date).aggregate(
-            total_cash=Sum(
-                Case(
-                    When(transaction_type='SALE', then=F('amount')),
-                    When(transaction_type='PURCHASE', then=-F('amount')),
-                    When(transaction_type='EXPENSE', then=-F('amount')),
-                    When(transaction_type='ADJUSTMENT', then=F('amount')),
-                    default=Value(0),
-                    output_field=DecimalField(max_digits=15, decimal_places=2)
-                )
-            )
-        )['total_cash'] or 0
+        return self.get_cash_at(self.open_date)
 
     @property
     def closing_cash(self):
-        from inventory.models import Transaction
-        """
-        Calculate the total cash available at the end of the reporting period.
-        This considers all transactions that occurred strictly before `close_date`.
-        """
-        return Transaction.objects.filter(date__lt=self.close_date).aggregate(
-            total_cash=Sum(
-                Case(
-                    When(transaction_type='SALE', then=F('amount')),
-                    When(transaction_type='PURCHASE', then=-F('amount')),
-                    When(transaction_type='EXPENSE', then=-F('amount')),
-                    When(transaction_type='ADJUSTMENT', then=F('amount')),
-                    default=Value(0),
-                    output_field=DecimalField(max_digits=15, decimal_places=2)
-                )
-            )
-        )['total_cash'] or 0
+        return self.get_cash_at(self.close_date)
     
     @property
     def expenses(self):
@@ -221,8 +114,8 @@ class Report(models.Model):
         for product in Product.objects.all():
             inventory.append({
                 'product': product.name,
-                'stock_level': product.get_stock_level(self.open_date),
-                'stock_value': product.get_stock_value(self.open_date),
+                'stock_level': product.get_stock_level_at(self.open_date),
+                'stock_value': product.get_stock_value_at(self.open_date),
             })
         return inventory
     
@@ -241,8 +134,8 @@ class Report(models.Model):
         for product in Product.objects.all():
             inventory.append({
                 'product': product.name,
-                'stock_level': product.get_stock_level(self.close_date),
-                'stock_value': product.get_stock_value(self.close_date),
+                'stock_level': product.get_stock_level_at(self.close_date),
+                'stock_value': product.get_stock_value_at(self.close_date),
             })
         return inventory
     
@@ -260,20 +153,60 @@ class Report(models.Model):
         from inventory.models import Product
         inventory = []
         for product in Product.objects.all():
-            if product.get_stock_level(self.open_date) or \
-                product.get_stock_level(self.close_date) or \
-                product.get_outgoing_stock(self.open_date, self.close_date) or \
-                product.get_incoming_stock(self.open_date, self.close_date):
+            if product.get_stock_level_at(self.open_date) or \
+                product.get_stock_level_at(self.close_date) or \
+                product.get_outgoing_stock_between(self.open_date, self.close_date) or \
+                product.get_incoming_stock_between(self.open_date, self.close_date):
                 inventory.append({
                     'product': product,
-                    'opening_stock_level': product.get_stock_level(self.open_date),
-                    'closing_stock_level': product.get_stock_level(self.close_date),
-                    'opening_stock_value': product.get_stock_value(self.open_date),
-                    'closing_stock_value': product.get_stock_value(self.close_date),
-                    'incoming_stock': product.get_incoming_stock(self.open_date, self.close_date),
-                    'outgoing_stock': product.get_outgoing_stock(self.open_date, self.close_date),
-                    'sales': product.get_total_sales(self.open_date, self.close_date),
+                    'opening_stock_level': product.get_stock_level_at(self.open_date),
+                    'closing_stock_level': product.get_stock_level_at(self.close_date),
+                    'opening_stock_value': product.get_stock_value_at(self.open_date),
+                    'closing_stock_value': product.get_stock_value_at(self.close_date),
+                    'incoming_stock': product.get_incoming_stock_between(self.open_date, self.close_date),
+                    'outgoing_stock': product.get_outgoing_stock_between(self.open_date, self.close_date),
+                    'sales': product.get_total_sales_between(self.open_date, self.close_date),
                     'cost_of_goods_sold': product.get_cost_of_goods_sold(self.open_date, self.close_date),
-                    'gross_profit': product.get_gross_profit(self.open_date, self.close_date),
+                    'gross_profit': product.get_gross_profit_between(self.open_date, self.close_date),
                 })
         return inventory
+
+    def get_stock_value_at(self, date):
+        from inventory.models import StockBatch, BatchMovement
+        return StockBatch.objects.filter(date_received__lt=date).annotate(
+            total_in=Coalesce(
+                Sum(
+                    'movements__quantity',
+                    filter=Q(movements__date__lt=date, movements__movement_type=BatchMovement.MovementType.IN),
+                ),
+                Value(Decimal(0.0))
+            ),
+            total_out=Coalesce(
+                Sum(
+                    'movements__quantity',
+                    filter=Q(movements__date__lt=date, movements__movement_type=BatchMovement.MovementType.OUT),
+                ),
+                Value(Decimal(0.0))
+            ),
+            net_qty=F('total_in') - F('total_out')
+        ).annotate(
+            value=ExpressionWrapper(
+                F('net_qty') * F('linked_object__unit_cost'),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            )
+        ).aggregate(total=Coalesce(Sum('value'), Value(Decimal(0.0))))['total']
+
+    def get_cash_at(self, date):
+        from inventory.models import Transaction
+        return Transaction.objects.filter(date__lt=date).aggregate(
+            total_cash=Sum(
+                Case(
+                    When(transaction_type='SALE', then=F('amount')),
+                    When(transaction_type='PURCHASE', then=-F('amount')),
+                    When(transaction_type='EXPENSE', then=-F('amount')),
+                    When(transaction_type='ADJUSTMENT', then=F('amount')),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                )
+            )
+        )['total_cash'] or 0

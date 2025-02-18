@@ -86,7 +86,7 @@ class Product(models.Model):
         Compute average based on the last N in-stock SaleItems, ignoring items
         that were partially out of stock (net_stock < item.quantity).
         """
-        N = settings.AVERAGE_INTERVAL_DAYS  # or a fixed integer like 7
+        N = settings.AVERAGE_INTERVAL_DAYS 
         
         # 1. Start with all SaleItems of this product.
         queryset = self.sale_items.all()
@@ -218,7 +218,7 @@ class Product(models.Model):
             return saleItem.profit_per_unit
         return 0
     
-    def get_stock_level(self, date):
+    def get_stock_level_at(self, date):
         """
         Calculate stock level at a specific date.
         """
@@ -226,21 +226,21 @@ class Product(models.Model):
         stock_out = self.stock_movements.filter(movement_type='OUT', date__lt=date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_in - stock_out
     
-    def get_incoming_stock(self, start_date, end_date):
+    def get_incoming_stock_between(self, start_date, end_date):
         """
         Calculate stock increase between two dates.
         """
         stock_in = self.stock_movements.filter(movement_type='IN', date__gte=start_date, date__lt=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_in
     
-    def get_outgoing_stock(self, start_date, end_date):
+    def get_outgoing_stock_between(self, start_date, end_date):
         """
         Calculate stock decrease between two dates.
         """
         stock_out = self.stock_movements.filter(movement_type='OUT', date__gte=start_date, date__lt=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_out
     
-    def get_stock_value(self, date):
+    def get_stock_value_at(self, date):
         """
         Calculate stock value at a specific date.
         """
@@ -274,7 +274,7 @@ class Product(models.Model):
         if remaining > 0.001:
             raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
         
-    def get_total_purchases(self, start_date, end_date):
+    def get_total_purchases_between(self, start_date, end_date):
         """
         Get all purchase items between two dates.
         """
@@ -287,17 +287,17 @@ class Product(models.Model):
                 )
             ).aggregate(total=models.Sum('line_total'))['total'] or 0
 
-    def get_gross_profit(self, start_date, end_date):
+    def get_gross_profit_between(self, start_date, end_date):
         """
         Calculate gross profit 
         Sales - Cost of goods sold (opening stock value + purchases - closing stock value)
         """
-        sales = self.get_total_sales(start_date, end_date)
+        sales = self.get_total_sales_between(start_date, end_date)
         cost_of_goods_sold = self.get_cost_of_goods_sold(start_date, end_date)
         
         return sales - cost_of_goods_sold
     
-    def get_total_sales(self, start_date, end_date):
+    def get_total_sales_between(self, start_date, end_date):
         """
         Get all sale items between two dates.
         """
@@ -314,15 +314,15 @@ class Product(models.Model):
         """
         Get cost of goods sold between two dates
         """
-        opening_stock_value = self.get_stock_value(start_date)
-        closing_stock_value = self.get_stock_value(end_date)
-        purchases = self.get_total_purchases(start_date, end_date)
-        conversions_in = self.get_conversions_in(start_date, end_date)
-        conversions_out = self.get_conversions_out(start_date, end_date)
+        opening_stock_value = self.get_stock_value_at(start_date)
+        closing_stock_value = self.get_stock_value_at(end_date)
+        purchases = self.get_total_purchases_between(start_date, end_date)
+        conversions_in = self.get_conversions_in_between(start_date, end_date)
+        conversions_out = self.get_conversions_out_between(start_date, end_date)
         
         return opening_stock_value + purchases + conversions_in - closing_stock_value - conversions_out
 
-    def get_conversions_out(self, start_date, end_date):
+    def get_conversions_out_between(self, start_date, end_date):
         """
         Get all stock conversions in between two dates.
         """
@@ -335,7 +335,7 @@ class Product(models.Model):
             )
         ).aggregate(total=models.Sum('line_total'))['total'] or 0
     
-    def get_conversions_in(self, start_date, end_date):
+    def get_conversions_in_between(self, start_date, end_date):
         """
         Get all stock conversions in between two dates.
         """
