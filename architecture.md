@@ -14,7 +14,7 @@ flowchart TB
 
     subgraph AWS Infrastructure
         RDS[(Amazon RDS<br>PostgreSQL)]
-        ElastiCache[(Amazon ElastiCache)
+        ElastiCache[Amazon ElastiCache]
         DjangoEC2 -- Read/Write --> RDS
         DjangoEC2 -- Caching --> ElastiCache
     end
