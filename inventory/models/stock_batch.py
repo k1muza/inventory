@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db.models import F, Sum, DecimalField, ExpressionWrapper, Subquery, OuterRef
 from django.db.models.functions import Coalesce
+from django.contrib.contenttypes.fields import GenericRelation
 
 
 class StockBatch(models.Model):

@@ -1,9 +1,10 @@
 from decimal import Decimal
 from django.db import models
-from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from django.db.models import DecimalField, Sum, F, ExpressionWrapper, Case, When, Value, Q
+from django.db.models import DecimalField, Sum, F, ExpressionWrapper, Case, When, Value, Q, Sum, Subquery, OuterRef
+from django.db.models.functions import Coalesce
+from django.contrib.contenttypes.models import ContentType
 
 
 class Report(models.Model):
@@ -172,7 +173,7 @@ class Report(models.Model):
         return inventory
 
     def get_stock_value_at(self, date):
-        from inventory.models import StockBatch, BatchMovement
+        from inventory.models import StockBatch, BatchMovement, PurchaseItem, StockAdjustment, StockConversion  
         return StockBatch.objects.filter(date_received__lt=date).annotate(
             total_in=Coalesce(
                 Sum(
@@ -191,7 +192,21 @@ class Report(models.Model):
             net_qty=F('total_in') - F('total_out')
         ).annotate(
             value=ExpressionWrapper(
-                F('net_qty') * F('linked_object__unit_cost'),
+                F('net_qty') * Case(
+                    When(content_type=ContentType.objects.get_for_model(PurchaseItem),
+                        then=Subquery(
+                            PurchaseItem.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1]
+                        )),
+                    When(content_type=ContentType.objects.get_for_model(StockAdjustment),
+                        then=Subquery(
+                            StockAdjustment.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1]
+                        )),
+                    When(content_type=ContentType.objects.get_for_model(StockConversion),
+                        then=Subquery(
+                            StockConversion.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1]
+                        )),
+                    default=Value(Decimal(0.0)),
+                ),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
         ).aggregate(total=Coalesce(Sum('value'), Value(Decimal(0.0))))['total']
