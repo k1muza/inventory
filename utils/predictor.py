@@ -64,7 +64,7 @@ class Predictor:
     def build_dataframe_for_prophet(self, product, start_date, end_date):
         """
         Produce a DataFrame where each row corresponds to one SaleItem row.
-        'ds' = sale.date, 'y' = final_quantity or 0 if limited by stock.
+        'ds' = sale.date, 'y' = final_quantity or None if limited by stock.
         """
 
         qs = self.get_annotated_saleitems(product, start_date, end_date)

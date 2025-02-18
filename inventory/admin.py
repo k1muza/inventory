@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 from django.conf import settings
 from django.utils.safestring import mark_safe
+from utils.predictor import Predictor
 from weasyprint import HTML
 
 from .models import Expense, StockAdjustment, StockBatch, BatchMovement, Report, StockConversion, Supplier, Product, StockMovement, Purchase, PurchaseItem, Sale, SaleItem, Transaction
@@ -159,6 +160,7 @@ class ProductAdmin(admin.ModelAdmin):
             path('<int:object_id>/download-pdf/', self.admin_site.admin_view(self.download_pdf), name='product-download-pdf'),
             path('suggest-budget/', self.admin_site.admin_view(self.suggest_budget_view), name='product-suggest-budget'),
             path('sales-graph/', self.admin_site.admin_view(self.sales_graph), name='product-sales-graph'),
+            path('sales-predictions/', self.admin_site.admin_view(self.sales_predictions), name='product-sales-predictions'),
         ]
         return custom_urls + urls
 
@@ -266,6 +268,30 @@ class ProductAdmin(admin.ModelAdmin):
         }
 
         return render(request, 'admin/product_sales_graph.html', context)
+    
+    def sales_predictions(self, request):
+        predictor = Predictor()
+        products = Product.objects.filter(predict_demand=True, is_active=True, unit='kg')
+        line = []
+        for p in products:
+            forecasts = predictor.predict_sales(p)
+            sales = []
+            for forecast in forecasts:
+                sales.append({
+                    'date': forecast['ds'].strftime('%Y-%m-%d'),
+                    'quantity': round(forecast['yhat'], 3),
+                })
+
+            line.append({
+                'name': p.name,
+                'sales': sales
+            })
+
+        context = {
+            'products': line,
+        }
+
+        return render(request, 'admin/product_sales_predictions.html', context)
 
 
 class PurchaseItemInline(admin.TabularInline):

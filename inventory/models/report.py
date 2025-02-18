@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from django.db.models import DecimalField
+from django.db.models import DecimalField, Sum, F, ExpressionWrapper
 
 
 class Report(models.Model):
@@ -19,13 +19,25 @@ class Report(models.Model):
     
     @property
     def total_sales(self):
-        from inventory.models import Sale
-        return sum(sale.total_amount for sale in Sale.objects.filter(date__range=[self.open_date, self.close_date]))
+        from inventory.models import SaleItem
+        return SaleItem.objects.filter(sale__date__range=[self.open_date, self.close_date]).annotate(
+            line_total=ExpressionWrapper(
+                F('quantity') * F('unit_price'),
+                output_field=DecimalField(max_digits=10, decimal_places=3)
+            )
+        ).aggregate(total=models.Sum('line_total'))['total'] or 0
+
+
     
     @property
     def total_purchases(self):
-        from inventory.models import Purchase
-        return sum(purchase.total_amount for purchase in Purchase.objects.filter(date__range=[self.open_date, self.close_date]))
+        from inventory.models import PurchaseItem
+        return PurchaseItem.objects.filter(purchase__date__range=[self.open_date, self.close_date]).annotate(
+            line_total=ExpressionWrapper(
+                F('quantity') * F('unit_cost'),
+                output_field=DecimalField(max_digits=10, decimal_places=3)
+            )
+        ).aggregate(total=models.Sum('line_total'))['total'] or 0
     
     @property
     def cost_of_goods_sold(self):
@@ -35,7 +47,9 @@ class Report(models.Model):
     @property
     def total_expenses(self):
         from inventory.models import Expense
-        return sum(expense.amount for expense in Expense.objects.filter(date__range=[self.open_date, self.close_date]))
+        return Expense.objects.filter(date__range=[self.open_date, self.close_date]).aggregate(
+            total=Sum('amount')
+        )['total']
     
     @property
     def net_profit(self):
