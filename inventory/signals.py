@@ -8,7 +8,7 @@ from .models import Expense, StockBatch, BatchMovement, PurchaseItem, SaleItem, 
 @receiver(post_save, sender=PurchaseItem)
 def on_purchase_item_save(sender, instance: PurchaseItem, created, **kwargs):
     purchase_ct = ContentType.objects.get_for_model(PurchaseItem)
-    StockMovement.objects.get_or_create(
+    StockMovement.objects.update_or_create(
         content_type=purchase_ct,
         object_id=instance.id,
         defaults={
@@ -19,7 +19,7 @@ def on_purchase_item_save(sender, instance: PurchaseItem, created, **kwargs):
         }
     )
     
-    StockBatch.objects.get_or_create(
+    StockBatch.objects.update_or_create(
         content_type=purchase_ct,
         object_id=instance.id,
         defaults=dict(
@@ -28,7 +28,7 @@ def on_purchase_item_save(sender, instance: PurchaseItem, created, **kwargs):
     )
 
     if not instance.purchase.is_initial_stock:
-        Transaction.objects.get_or_create(
+        Transaction.objects.update_or_create(
             content_type=purchase_ct,
             object_id=instance.id,
             defaults={
@@ -128,7 +128,7 @@ def on_stock_adjustment_save(sender, instance: StockAdjustment, created, **kwarg
                 date_received=instance.date,
             )
         )
-        StockMovement.objects.get_or_create(
+        StockMovement.objects.update_or_create(
             content_type=adjustment_ct,
             object_id=instance.id,
             product=instance.product,
@@ -139,7 +139,7 @@ def on_stock_adjustment_save(sender, instance: StockAdjustment, created, **kwarg
             )
         )
     else:
-        StockMovement.objects.get_or_create(
+        StockMovement.objects.update_or_create(
             content_type=adjustment_ct,
             object_id=instance.id,
             product=instance.product,
