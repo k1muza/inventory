@@ -76,7 +76,7 @@ class Product(models.Model):
             ) |
             Q(
                 content_type=ContentType.objects.get_for_model(StockConversion),
-                object_id__in=self.conversions.values_list('id', flat=True)
+                object_id__in=self.conversions_to.values_list('id', flat=True)
             )
         ).order_by('date_received')
 
@@ -339,7 +339,7 @@ class Product(models.Model):
         """
         Get all stock conversions in between two dates.
         """
-        return self.conversions.filter(
+        return self.conversions_to.filter(
             date__range=[start_date, end_date],
         ).annotate(
             line_total=ExpressionWrapper(
