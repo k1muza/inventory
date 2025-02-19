@@ -2,7 +2,7 @@ import time
 from functools import wraps
 from logging import getLogger
 
-logger = getLogger(__name__)
+logger = getLogger('django')
 
 def timer(func):
     """Prints the execution time of a function. Used as a decorator."""
@@ -11,6 +11,6 @@ def timer(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         end = time.perf_counter()
-        logger.debug(f"{func.__name__!r} executed in {(end-start):.3f}s")
+        logger.info(f"{func.__name__!r} executed in {(end-start):.3f}s")
         return result
     return wrapper

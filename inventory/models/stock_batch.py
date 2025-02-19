@@ -10,16 +10,14 @@ from django.db.models.functions import Coalesce
 class StockBatchQuerySet(models.QuerySet):
     def annotate_batch_quantities(self):
         """
-        Annotate the queryset with total 'IN' and 'OUT' batch movement quantities.
+        Annotate the queryset with the total quantity received and the total
+        quantity despatched for each batch, and the quantity remaining.
 
-        This function adds two annotations to the given queryset:
-        - total_in: The sum of quantities for movements with type 'IN'.
-        - total_out: The sum of quantities for movements with type 'OUT'.
-
-        Both annotations make use of Coalesce to ensure a default value of 0.0 is 
-        returned if there are no matching movements of the respective type.
+        The annotations are:
+        - `total_in`: The total quantity received for this batch.
+        - `total_out`: The total quantity despatched from this batch.
+        - `quantity_remaining`: The quantity remaining in this batch.
         """
-
         from inventory.models import BatchMovement
         return self.annotate(
             total_in=Coalesce(
@@ -40,6 +38,8 @@ class StockBatchQuerySet(models.QuerySet):
                 ),
                 Value(Decimal('0.0')),
             ),
+        ).annotate(
+            quantity_remaining=F('total_in') - F('total_out')
         )
     
     def annotate_batch_costs(self):
@@ -98,18 +98,10 @@ class StockBatchQuerySet(models.QuerySet):
     
     def filter_empty_batches(self):
         """
-        Filter the queryset to include only batches with a positive net quantity.
-
-        This function first annotates the queryset with a `quantity_remaining` field,
-        calculated as the difference between `total_in` and `total_out` quantities for
-        each batch. It then filters the queryset to retain only those entries where
-        `quantity_remaining` is greater than zero, effectively excluding empty or 
-        depleted batches.
+        Filter out batches with a quantity_remaining of 0.0.
         """
 
-        return self.annotate(
-            quantity_remaining=F('total_in') - F('total_out')
-        ).filter(quantity_remaining__gt=Decimal('0.0'))
+        return self.filter(quantity_remaining__gt=Decimal('0.0'))
 
 class StockBatch(models.Model):
     date_received = models.DateTimeField(default=timezone.now)

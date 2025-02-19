@@ -52,15 +52,16 @@ class Product(models.Model):
         """
         from inventory.models.stock_batch import StockBatchQuerySet
         qs: StockBatchQuerySet = self.batches
-        
+               
         return (
             qs.filter(date_received__lt=timezone.now())
             .annotate_batch_quantities()
             .filter_empty_batches()
-            .aggregate(total=Sum('quantity_remaining'))['total']
+            .aggregate(total=Sum('quantity_remaining'))['total'] or 0
         )
     
     @property
+    @timer
     def stock_value(self, date=None):
         """
         Calculate the product's stock value using DB-level aggregation.
@@ -82,9 +83,10 @@ class Product(models.Model):
             .annotate_batch_quantities()
             .filter_empty_batches()
             .annotate_batch_costs()
+            .annotate_batch_values()
             .aggregate(
                 total_value=Coalesce(Sum('batch_value'), Value(Decimal('0.0')))
-            )['total_value']
+            )['total_value'] or 0
         )
     
     @cached_property
