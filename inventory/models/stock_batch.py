@@ -3,10 +3,113 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.db.models import F, Sum, DecimalField, ExpressionWrapper, Subquery, OuterRef
+from django.db.models import F, Sum, DecimalField, ExpressionWrapper, Subquery, OuterRef, Value, Case, When
 from django.db.models.functions import Coalesce
-from django.contrib.contenttypes.fields import GenericRelation
 
+
+class StockBatchQuerySet(models.QuerySet):
+    def annotate_batch_quantities(self):
+        """
+        Annotate the queryset with total 'IN' and 'OUT' batch movement quantities.
+
+        This function adds two annotations to the given queryset:
+        - total_in: The sum of quantities for movements with type 'IN'.
+        - total_out: The sum of quantities for movements with type 'OUT'.
+
+        Both annotations make use of Coalesce to ensure a default value of 0.0 is 
+        returned if there are no matching movements of the respective type.
+        """
+
+        from inventory.models import BatchMovement
+        return self.annotate(
+            total_in=Coalesce(
+                Sum(
+                    Case(
+                        When(movements__movement_type=BatchMovement.MovementType.IN, then=F('movements__quantity')),
+                        default=Value(Decimal('0.0')),
+                    ),
+                ),
+                Value(Decimal('0.0')),
+            ),
+            total_out=Coalesce(
+                Sum(
+                    Case(
+                        When(movements__movement_type=BatchMovement.MovementType.OUT, then=F('movements__quantity')),
+                        default=Value(Decimal('0.0')),
+                    )
+                ),
+                Value(Decimal('0.0')),
+            ),
+        )
+    
+    def annotate_batch_costs(self):
+        """
+        Annotate the queryset with the effective unit cost based on the linked object type.
+
+        This function adds an annotation to the queryset:
+        - effective_unit_cost: The unit cost determined by the linked content type.
+        The annotation is calculated using a Case expression that evaluates the
+        content type of each object in the queryset. The effective unit cost is 
+        retrieved from related models such as PurchaseItem, StockAdjustment, or 
+        StockConversion using a Subquery.
+
+        The default value of the effective unit cost is set to 0. The annotation 
+        uses a DecimalField with a precision of up to 15 digits and 6 decimal places.
+        """
+
+        from inventory.models import PurchaseItem, StockAdjustment, StockConversion
+
+        return self.annotate(
+            effective_unit_cost=Case(
+                When(
+                    content_type=ContentType.objects.get_for_model(PurchaseItem), 
+                    then=Subquery(PurchaseItem.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])
+                ),
+                When(
+                    content_type=ContentType.objects.get_for_model(StockAdjustment), 
+                    then=Subquery(StockAdjustment.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])
+                ),
+                When(
+                    content_type=ContentType.objects.get_for_model(StockConversion), 
+                    then=Subquery(StockConversion.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])
+                ),
+                default=Value(0),
+                output_field=DecimalField(max_digits=15, decimal_places=6),
+            )
+        )
+    
+    def annotate_batch_values(self):
+        """
+        Annotate the queryset with the total value of each batch.
+
+        This function adds an annotation to the queryset:
+        - batch_value: The total value of each batch, calculated as quantity_remaining * effective_unit_cost.
+
+        The annotation is calculated using an ExpressionWrapper that multiplies the quantity_remaining
+        and effective_unit_cost fields of each batch object. The result is a DecimalField with a
+        precision of up to 15 digits and 2 decimal places.
+        """
+        return self.annotate(
+            batch_value=ExpressionWrapper(
+                F('quantity_remaining') * F('effective_unit_cost'),
+                output_field=DecimalField(max_digits=15, decimal_places=2),
+            )
+        )
+    
+    def filter_empty_batches(self):
+        """
+        Filter the queryset to include only batches with a positive net quantity.
+
+        This function first annotates the queryset with a `quantity_remaining` field,
+        calculated as the difference between `total_in` and `total_out` quantities for
+        each batch. It then filters the queryset to retain only those entries where
+        `quantity_remaining` is greater than zero, effectively excluding empty or 
+        depleted batches.
+        """
+
+        return self.annotate(
+            quantity_remaining=F('total_in') - F('total_out')
+        ).filter(quantity_remaining__gt=Decimal('0.0'))
 
 class StockBatch(models.Model):
     date_received = models.DateTimeField(default=timezone.now)
@@ -15,6 +118,8 @@ class StockBatch(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     linked_object = GenericForeignKey('content_type', 'object_id')
+
+    objects = StockBatchQuerySet.as_manager()
 
     class Meta:
         ordering = ['date_received', 'id']

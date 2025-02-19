@@ -3,14 +3,13 @@ from decimal import Decimal
 import math
 from django.db import models
 from django.utils import timezone
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count, Case, When, Value, Subquery, OuterRef
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count, Case, When, Value, Subquery, OuterRef, QuerySet
 from django.db.models.functions import Coalesce
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 
 from utils.decorators import timer
-
 
 
 class Product(models.Model):
@@ -41,11 +40,25 @@ class Product(models.Model):
         return stock_in - stock_out
     
     @property
+    @timer
+    def batch_based_stock_level_old(self):
+        return sum(batch.quantity_remaining for batch in self.batches)
+    
+    @property
+    @timer
     def batch_based_stock_level(self):
         """
-        Calculate batch level based on stock batches.
+        Calculate current stock level based on batches.
         """
-        return sum(batch.quantity_remaining for batch in self.batches)
+        from inventory.models.stock_batch import StockBatchQuerySet
+        qs: StockBatchQuerySet = self.batches
+        
+        return (
+            qs.filter(date_received__lt=timezone.now())
+            .annotate_batch_quantities()
+            .filter_empty_batches()
+            .aggregate(total=Sum('quantity_remaining'))['total']
+        )
     
     @property
     def stock_value(self, date=None):
@@ -57,73 +70,25 @@ class Product(models.Model):
         - PurchaseItem, StockAdjustment, or StockConversion.
         Only batches with a positive net quantity are included.
         """
-        from inventory.models import BatchMovement, PurchaseItem, StockAdjustment, StockConversion
+        from inventory.models.stock_batch import StockBatchQuerySet
 
         if date is None:
             date = timezone.now()
 
-        # Get content types for each possible linked model
-        purchase_item_ct = ContentType.objects.get_for_model(PurchaseItem)
-        stock_adjustment_ct = ContentType.objects.get_for_model(StockAdjustment)
-        stock_conversion_ct = ContentType.objects.get_for_model(StockConversion)
+        qs: StockBatchQuerySet = self.batches
 
-        qs = self.batches.filter(date_received__lt=date)
-
-        # Annotate each batch with total IN and OUT quantities
-        qs = qs.annotate(
-            total_in=Coalesce(
-                Sum(
-                    Case(
-                        When(movements__movement_type=BatchMovement.MovementType.IN, then=F('movements__quantity')),
-                        default=Value(Decimal('0.0')),
-                    ),
-                ),
-                Value(Decimal('0.0')),
-            ),
-            total_out=Coalesce(
-                Sum(
-                    Case(
-                        When(movements__movement_type=BatchMovement.MovementType.OUT, then=F('movements__quantity')),
-                        default=Value(Decimal('0.0')),
-                    )
-                ),
-                Value(Decimal('0.0')),
-            ),
+        return (
+            qs.filter(date_received__lt=date)
+            .annotate_batch_quantities()
+            .filter_empty_batches()
+            .annotate_batch_costs()
+            .aggregate(
+                total_value=Coalesce(Sum('batch_value'), Value(Decimal('0.0')))
+            )['total_value']
         )
-
-        # Compute remaining quantity and filter out empty batches
-        qs = qs.annotate(
-            quantity_remaining=F('total_in') - F('total_out')
-        ).filter(quantity_remaining__gt=Decimal('0.0'))
-
-        # Annotate each batch with the effective unit cost based on the content type
-        qs = qs.annotate(
-            effective_unit_cost=Case(
-                When(content_type=purchase_item_ct, then=Subquery(PurchaseItem.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])),
-                When(content_type=stock_adjustment_ct, then=Subquery(StockAdjustment.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])),
-                When(content_type=stock_conversion_ct, then=Subquery(StockConversion.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])),
-                default=Value(0),
-                output_field=DecimalField(max_digits=15, decimal_places=6),
-            )
-        )
-
-        # Calculate the value for each batch
-        qs = qs.annotate(
-            batch_value=ExpressionWrapper(
-                F('quantity_remaining') * F('effective_unit_cost'),
-                output_field=DecimalField(max_digits=15, decimal_places=2),
-            )
-        )
-
-        # Sum up the batch values to get the total stock value
-        result = qs.aggregate(
-            total_value=Coalesce(Sum('batch_value'), Value(Decimal('0.0')))
-        )['total_value']
-
-        return result
-
+    
     @cached_property
-    def batches(self):
+    def batches(self) -> QuerySet:
         from inventory.models import StockAdjustment, StockConversion, PurchaseItem, StockBatch
 
         return StockBatch.objects.filter(

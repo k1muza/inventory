@@ -127,7 +127,7 @@ class ProductAdmin(admin.ModelAdmin):
     
     @admin.display(description="Batch Level")
     def batch_level(self, obj: Product):
-        return f"{obj.batch_based_stock_level:.3f} {obj.unit}"
+        return f"${obj.batch_based_stock_level_old:.2f} {obj.batch_based_stock_level:.3f} {obj.unit}"
     
     @admin.display(description="Stock Value")
     def stock_value(self, obj: Product):
