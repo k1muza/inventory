@@ -115,7 +115,7 @@ class Product(models.Model):
 
         # Sum up the batch values to get the total stock value
         result = qs.aggregate(
-            total_value=Coalesce(Sum('batch_value'), Value(0))
+            total_value=Coalesce(Sum('batch_value'), Value(Decimal('0.0')))
         )['total_value']
 
         return result
