@@ -92,7 +92,7 @@ class Product(models.Model):
         # Compute remaining quantity and filter out empty batches
         qs = qs.annotate(
             quantity_remaining=F('total_in') - F('total_out')
-        ).filter(quantity_remaining__gt=0.0)
+        ).filter(quantity_remaining__gt=Decimal('0.0'))
 
         # Annotate each batch with the effective unit cost based on the content type
         qs = qs.annotate(
