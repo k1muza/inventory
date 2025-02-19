@@ -73,19 +73,19 @@ class Product(models.Model):
                 Sum(
                     Case(
                         When(movements__movement_type=BatchMovement.MovementType.IN, then=F('movements__quantity')),
-                        default=Value(0),
+                        default=Value(0.0),
                     ),
                 ),
-                Value(0),
+                Value(0.0),
             ),
             total_out=Coalesce(
                 Sum(
                     Case(
                         When(movements__movement_type=BatchMovement.MovementType.OUT, then=F('movements__quantity')),
-                        default=Value(0),
+                        default=Value(0.0),
                     )
                 ),
-                Value(0),
+                Value(0.0),
             ),
         )
 
