@@ -9,8 +9,6 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 
-from utils.decorators import timer
-
 
 class Product(models.Model):
     supplier = models.ForeignKey('inventory.Supplier', on_delete=models.SET_NULL, null=True, blank=True)
@@ -55,7 +53,6 @@ class Product(models.Model):
         )
     
     @property
-    @timer
     def stock_value(self, date=None):
         """
         Calculate the product's stock value using DB-level aggregation.
