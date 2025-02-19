@@ -40,12 +40,6 @@ class Product(models.Model):
         return stock_in - stock_out
     
     @property
-    @timer
-    def batch_based_stock_level_old(self):
-        return sum(batch.quantity_remaining for batch in self.batches)
-    
-    @property
-    @timer
     def batch_based_stock_level(self):
         """
         Calculate current stock level based on batches.
