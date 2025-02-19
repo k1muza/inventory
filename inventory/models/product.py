@@ -48,7 +48,6 @@ class Product(models.Model):
         return sum(batch.quantity_remaining for batch in self.batches)
     
     @property
-    @timer
     def stock_value(self, date=None):
         """
         Calculate the product's stock value using DB-level aggregation.
@@ -122,26 +121,7 @@ class Product(models.Model):
         )['total_value']
 
         return result
-    
-    # deprecated
-    @property
-    @timer
-    def stock_value_old(self):
-        """
-        Sum up quantity_remaining * the batch's unit_cost 
-        across all *non-empty* or relevant batches.
-        """
-        from decimal import Decimal
-        total_value = Decimal('0.0')
 
-        for batch in self.batches:
-            if not batch.is_empty:
-                qty = batch.quantity_remaining
-                cost = batch.unit_cost
-                total_value += (qty * cost)
-
-        return total_value
-    
     @cached_property
     def batches(self):
         from inventory.models import StockAdjustment, StockConversion, PurchaseItem, StockBatch

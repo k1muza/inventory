@@ -131,7 +131,7 @@ class ProductAdmin(admin.ModelAdmin):
     
     @admin.display(description="Stock Value")
     def stock_value(self, obj: Product):
-        return f"${obj.stock_value_old:.2f} ${obj.stock_value:.2f}"
+        return f"${obj.stock_value:.2f}"
 
     @admin.display(description="Below Minimum Stock", boolean=True)
     def is_below_minimum_stock(self, obj: Product):
