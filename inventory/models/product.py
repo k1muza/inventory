@@ -9,6 +9,8 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
 
+from utils.decorators import timer
+
 
 
 class Product(models.Model):
@@ -46,6 +48,7 @@ class Product(models.Model):
         return sum(batch.quantity_remaining for batch in self.batches)
     
     @property
+    @timer
     def stock_value(self, date=None):
         """
         Calculate the product's stock value using DB-level aggregation.
@@ -122,6 +125,7 @@ class Product(models.Model):
     
     # deprecated
     @property
+    @timer
     def stock_value_old(self):
         """
         Sum up quantity_remaining * the batch's unit_cost 
