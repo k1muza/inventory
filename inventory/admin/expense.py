@@ -5,8 +5,8 @@ from inventory.models import Expense
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
-    list_display = ('expense_date', 'description', 'amount', )
-    list_filter = ('date', 'description')
+    list_display = ('expense_date', 'description', 'amount',)
+    list_filter = ('date', 'description',)
     search_fields = ('description',)
     ordering = ('-date',)
 

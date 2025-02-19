@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db.models import Sum
 from django.urls import path
 from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.utils import timezone
 from django.conf import settings
 from django.utils.safestring import mark_safe
@@ -20,7 +20,7 @@ class StockMovementInline(admin.TabularInline):
     ordering = ('-date',)  # Ensures movements are in chronological order
 
     @admin.display(description='Balance After')
-    def balance_after(self, obj):
+    def balance_after(self, obj: StockMovement):
         stock_in = obj.product.stock_movements.filter(
             movement_type='IN',
             date__lte=obj.date
@@ -173,7 +173,7 @@ class ProductAdmin(admin.ModelAdmin):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
-    def suggest_budget_view(self, request):
+    def suggest_budget_view(self, request: HttpRequest, *args, **kwargs):
         products = Product.objects.filter(is_active=True)
         suggested_purchases = []
         total_reorder_cost = 0

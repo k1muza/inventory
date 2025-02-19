@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django.urls import path
+from django.http import HttpResponseRedirect
 
-from inventory.models import BatchMovement, StockBatch
+from inventory.models import BatchMovement, StockBatch, PurchaseItem, StockAdjustment, StockConversion, SaleItem
 
 
 class BatchMovementInline(admin.TabularInline):
@@ -13,6 +15,7 @@ class BatchMovementInline(admin.TabularInline):
 
 @admin.register(StockBatch)
 class BatchAdmin(admin.ModelAdmin):
+    change_list_template = 'admin/stock_batch_change_list.html'
     list_display = (
         'date', 
         'product__name', 
@@ -57,3 +60,30 @@ class BatchAdmin(admin.ModelAdmin):
     @admin.display(description='Unit Cost')
     def unit_cost(self, obj: StockBatch):
         return f"${obj.linked_object.unit_cost:.2f}"
+    
+    def get_urls(self):
+        urls = super().get_urls()
+        my_urls = [
+            path('batches-recalculate/', self.admin_site.admin_view(self.recalculate_batches), name='batches-recalculate'),
+        ]
+        return my_urls + urls
+    
+    def recalculate_batches(self, request):
+        StockBatch.objects.all().delete()
+
+        for item in PurchaseItem.objects.all():
+            item.save()
+
+        for item in StockAdjustment.objects.all():
+            item.save()
+
+        for item in StockConversion.objects.all():
+            item.save()
+
+        for item in SaleItem.objects.all():
+            item.save()
+
+        self.message_user(request, 'Batches Recalculated')
+
+        # Redirect to batches list
+        return HttpResponseRedirect(request.path)
