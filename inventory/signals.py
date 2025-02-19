@@ -58,17 +58,21 @@ def on_purchase_item_delete(sender, instance: PurchaseItem, **kwargs):
 
 @receiver(post_save, sender=SaleItem)
 def on_sale_item_save(sender, instance: SaleItem, created, **kwargs):
-    purchase_ct = ContentType.objects.get_for_model(SaleItem)
-    StockMovement.objects.update_or_create(
-        content_type=purchase_ct,
-        object_id=instance.id,
-        defaults=dict(
-            product=instance.product,
-            movement_type='OUT',
-            quantity=instance.quantity,
-            date=instance.sale.date,
+    saleitem_ct = ContentType.objects.get_for_model(SaleItem)
+    try:
+        StockMovement.objects.update_or_create(
+            content_type=saleitem_ct,
+            object_id=instance.id,
+            defaults=dict(
+                product=instance.product,
+                movement_type='OUT',
+                quantity=instance.quantity,
+                date=instance.sale.date,
+            )
         )
-    )
+    except Exception as e:
+        print(f"Error consuming product {instance.product}: {e}")
+
     instance.transactions.update_or_create(
         defaults=dict(
             date=instance.sale.date,
