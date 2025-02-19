@@ -3,11 +3,12 @@ from decimal import Decimal
 import math
 from django.db import models
 from django.utils import timezone
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count, Case, When, Value, Subquery, OuterRef
 from django.db.models.functions import Coalesce
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
+
 
 
 class Product(models.Model):
@@ -45,7 +46,83 @@ class Product(models.Model):
         return sum(batch.quantity_remaining for batch in self.batches)
     
     @property
-    def stock_value(self):
+    def stock_value(self, date=None):
+        """
+        Calculate the product's stock value using DB-level aggregation.
+        For each batch received before `date`, this computes:
+            (net quantity = total_in - total_out) * effective_unit_cost
+        where the effective_unit_cost is determined based on the linked object type:
+        - PurchaseItem, StockAdjustment, or StockConversion.
+        Only batches with a positive net quantity are included.
+        """
+        from inventory.models import BatchMovement, PurchaseItem, StockAdjustment, StockConversion
+
+        if date is None:
+            date = timezone.now()
+
+        # Get content types for each possible linked model
+        purchase_item_ct = ContentType.objects.get_for_model(PurchaseItem)
+        stock_adjustment_ct = ContentType.objects.get_for_model(StockAdjustment)
+        stock_conversion_ct = ContentType.objects.get_for_model(StockConversion)
+
+        qs = self.batches.filter(date_received__lt=date)
+
+        # Annotate each batch with total IN and OUT quantities
+        qs = qs.annotate(
+            total_in=Coalesce(
+                Sum(
+                    Case(
+                        When(movements__movement_type=BatchMovement.MovementType.IN, then=F('movements__quantity')),
+                        default=Value(0),
+                    )
+                ),
+                Value(0),
+            ),
+            total_out=Coalesce(
+                Sum(
+                    Case(
+                        When(movements__movement_type=BatchMovement.MovementType.OUT, then=F('movements__quantity')),
+                        default=Value(0),
+                    )
+                ),
+                Value(0),
+            ),
+        )
+
+        # Compute remaining quantity and filter out empty batches
+        qs = qs.annotate(
+            quantity_remaining=F('total_in') - F('total_out')
+        ).filter(quantity_remaining__gt=0)
+
+        # Annotate each batch with the effective unit cost based on the content type
+        qs = qs.annotate(
+            effective_unit_cost=Case(
+                When(content_type=purchase_item_ct, then=Subquery(PurchaseItem.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])),
+                When(content_type=stock_adjustment_ct, then=Subquery(StockAdjustment.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])),
+                When(content_type=stock_conversion_ct, then=Subquery(StockConversion.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])),
+                default=Value(0),
+                output_field=DecimalField(max_digits=15, decimal_places=6),
+            )
+        )
+
+        # Calculate the value for each batch
+        qs = qs.annotate(
+            batch_value=ExpressionWrapper(
+                F('quantity_remaining') * F('effective_unit_cost'),
+                output_field=DecimalField(max_digits=15, decimal_places=2),
+            )
+        )
+
+        # Sum up the batch values to get the total stock value
+        result = qs.aggregate(
+            total_value=Coalesce(Sum('batch_value'), Value(0))
+        )['total_value']
+
+        return result
+    
+    # deprecated
+    @property
+    def stock_value_old(self):
         """
         Sum up quantity_remaining * the batch's unit_cost 
         across all *non-empty* or relevant batches.

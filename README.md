@@ -72,7 +72,7 @@ Create a .env file in the project root and add:
    SECRET_KEY=your-secret-key
    DEBUG=True
    ALLOWED_HOSTS=127.0.0.1,localhost
-   DATABASE_URL=your-database-connection-string
+   DATABASE_URL=sqlite:///db.sqlite3 # or 'postgres://user:pass@localhost/db'
    ```
 
 5. **Run Migrations:**
