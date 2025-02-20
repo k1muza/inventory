@@ -1,13 +1,18 @@
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Sum
 from django.db import transaction
+
 from .models import Expense, StockBatch, BatchMovement, PurchaseItem, SaleItem, StockAdjustment, StockConversion, StockMovement, Transaction
 
 
 @receiver(post_save, sender=PurchaseItem)
 def on_purchase_item_save(sender, instance: PurchaseItem, created, **kwargs):
     purchase_ct = ContentType.objects.get_for_model(PurchaseItem)
+    if instance.quantity <= 0:
+        return
+    
     StockMovement.objects.update_or_create(
         content_type=purchase_ct,
         object_id=instance.id,
@@ -58,20 +63,20 @@ def on_purchase_item_delete(sender, instance: PurchaseItem, **kwargs):
 
 @receiver(post_save, sender=SaleItem)
 def on_sale_item_save(sender, instance: SaleItem, created, **kwargs):
+    if instance.quantity <= 0:
+        return
+    
     saleitem_ct = ContentType.objects.get_for_model(SaleItem)
-    try:
-        StockMovement.objects.update_or_create(
-            content_type=saleitem_ct,
-            object_id=instance.id,
-            defaults=dict(
-                product=instance.product,
-                movement_type='OUT',
-                quantity=instance.quantity,
-                date=instance.sale.date,
-            )
+    StockMovement.objects.update_or_create(
+        content_type=saleitem_ct,
+        object_id=instance.id,
+        defaults=dict(
+            product=instance.product,
+            movement_type='OUT',
+            quantity=instance.quantity,
+            date=instance.sale.date,
         )
-    except Exception as e:
-        print(f"Error consuming product {instance.product}: {e}")
+    )
 
     instance.transactions.update_or_create(
         defaults=dict(

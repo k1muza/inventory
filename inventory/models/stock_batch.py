@@ -116,6 +116,10 @@ class StockBatch(models.Model):
     class Meta:
         ordering = ['date_received', 'id']
         verbose_name_plural = 'Stock Batches'
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['date_received']),
+        ]
 
     def __str__(self):
         return f"{self.date_received.date()} - {self.linked_object.product.name} - {self.linked_object.quantity} {self.linked_object.product.unit}"
@@ -189,6 +193,13 @@ class StockBatch(models.Model):
         return revenue_aggregation - (unit_cost * Decimal(quantity_aggregation))  
     
     def consume(self, quantity, associated_item):
+        """
+        Consume stock from this batch.
+
+        :param quantity: The quantity to consume
+        :param associated_item: The item associated with the consumption (e.g. a SaleItem or PurchaseItem)
+        :return: The remaining quantity left after consumption.
+        """
         from inventory.models import BatchMovement
         ear_marked = min(quantity, self.quantity_remaining)
         ct = ContentType.objects.get_for_model(type(associated_item))

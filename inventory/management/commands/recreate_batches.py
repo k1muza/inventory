@@ -1,11 +1,20 @@
 from django.core.management.base import BaseCommand
 
 from inventory.models import StockAdjustment, StockBatch, SaleItem, PurchaseItem, StockConversion
+from utils.decorators import timer
 
 class Command(BaseCommand):
     help = 'Recreate transactions based on stock movements'
 
+    @timer
     def handle(self, *args, **options):
+        """
+        Deletes all existing stock batches and then recreates them by saving
+        all purchase items, stock adjustments, stock conversions, and sale items.
+        Finally, outputs a success message indicating the completion of the batch 
+        recreation process.
+        """
+
         StockBatch.objects.all().delete()
 
         for item in PurchaseItem.objects.all():
