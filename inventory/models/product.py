@@ -278,7 +278,7 @@ class Product(models.Model):
     def is_below_minimum_stock(self):
         return self.stock_level < self.minimum_stock_level
     
-    def consume(self, quantity, sale_item):
+    def consume_new(self, quantity, sale_item):
         """
         Consume stock from the oldest batch(s) available.
         """
@@ -308,7 +308,7 @@ class Product(models.Model):
                     F('total_in') - F('total_out'),
                     output_field=DecimalField(max_digits=10, decimal_places=3)
                 ),
-            ).filter(in_stock__gte=0).earliest('date_received')
+            ).filter(in_stock__gte=0.001).earliest('date_received')
 
             if batch is None:
                 raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
@@ -318,7 +318,7 @@ class Product(models.Model):
         if remaining > 0.001:
             raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
     
-    def consume_old(self, quantity, sale_item):
+    def consume(self, quantity, sale_item):
         """
         Consume stock from the oldest batch(s) available.
         """
