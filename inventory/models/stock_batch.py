@@ -20,7 +20,7 @@ class StockBatchQuerySet(models.QuerySet):
         """
         from inventory.models import BatchMovement
         return self.annotate(
-            total_in=Coalesce(
+            outstanding=Coalesce(
                 Sum(
                     Case(
                         When(
@@ -31,11 +31,9 @@ class StockBatchQuerySet(models.QuerySet):
                             then=-F('movements__quantity')),
                         default=Value(Decimal('0.0')),
                     ),
-                    default=Value(Decimal('0.0')),
                 ),
+                Value(Decimal('0.0')),
             ),
-        ).annotate(
-            outstanding=F('total_in') - F('total_out')
         )
     
     def annotate_batch_costs(self):
