@@ -1,10 +1,32 @@
 from django.core.management.base import BaseCommand
 
 from inventory.models import StockAdjustment, StockBatch, SaleItem, PurchaseItem, StockConversion
+from inventory.models.batch_movement import BatchMovement
+from inventory.models.stock_movement import StockMovement
 from utils.decorators import timer
 
 class Command(BaseCommand):
     help = 'Recreate transactions based on stock movements'
+
+    @timer
+    def save_purchase_items(self):
+        for item in PurchaseItem.objects.all():
+            item.save()
+
+    @timer
+    def save_stock_adjustments(self):
+        for item in StockAdjustment.objects.all():
+            item.save()
+
+    @timer
+    def save_stock_conversions(self):
+        for item in StockConversion.objects.all():
+            item.save()
+
+    @timer
+    def save_sale_items(self):
+        for item in SaleItem.objects.all():
+            item.save()
 
     @timer
     def handle(self, *args, **options):
@@ -15,18 +37,33 @@ class Command(BaseCommand):
         recreation process.
         """
 
+        batches_count = StockBatch.objects.count()
+        self.stdout.write(self.style.SUCCESS(f'Found {batches_count} stock batches'))
         StockBatch.objects.all().delete()
+        StockMovement.objects.all().delete()
 
-        for item in PurchaseItem.objects.all():
-            item.save()
+        purchase_item_count = PurchaseItem.objects.count()
+        stock_adjustment_count = StockAdjustment.objects.count()
+        stock_conversion_count = StockConversion.objects.count()
+        sale_item_count = SaleItem.objects.count()
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Found {purchase_item_count} purchase items, {stock_adjustment_count} stock adjustments, {stock_conversion_count} stock conversions, and {sale_item_count} sale items'
+            )
+        )
 
-        for item in StockAdjustment.objects.all():
-            item.save()
+        self.save_purchase_items()
+        self.save_stock_adjustments()
+        self.save_stock_conversions()
+        self.save_sale_items()
 
-        for item in StockConversion.objects.all():
-            item.save()
+        batches_count = StockBatch.objects.count()
+        self.stdout.write(self.style.SUCCESS(f'Recreated {batches_count} stock batches'))
 
-        for item in SaleItem.objects.all():
-            item.save()
+        stock_movements_count = StockMovement.objects.count()
+        self.stdout.write(self.style.SUCCESS(f'Recreated {stock_movements_count} stock movements'))
 
-        self.stdout.write(self.style.SUCCESS('Successfully recreated purchase batches'))
+        batch_movements_count = BatchMovement.objects.count()
+        self.stdout.write(self.style.SUCCESS(f'Recreated {batch_movements_count} batch movements'))
+
+        self.stdout.write(self.style.SUCCESS('Done'))

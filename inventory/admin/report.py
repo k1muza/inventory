@@ -188,7 +188,7 @@ class ReportAdmin(admin.ModelAdmin):
             {
                 "report": report, 
                 "generated_at": timezone.now(),
-                "total": sum(i['gross_profit'] for i in report.inventory_balances)
+                "total": sum(i['gross_profit'] for i in report.product_performances)
             }
         ).content.decode("utf-8")
 

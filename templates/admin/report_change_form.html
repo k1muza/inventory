@@ -1,5 +1,29 @@
 {% extends "admin/change_form.html" %}
 
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    table.table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+    table.table th, table.table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    table.table th {
+        background-color: #f2f2f2;
+    }
+    table.table .right {
+        text-align: right;
+    }
+    table.table .bold {
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
 {% block object-tools-items %}
 {{ block.super }}
 {% if change %}
@@ -13,32 +37,73 @@
 {% endblock %}
 
 {% block after_field_sets %}
-<!-- Perhaps your existing summary table(s) -->
 <h2>Inventory Balances</h2>
-<table>
+<table class="table">
     <thead>
         <tr>
             <th>Product</th>
-            <th>Opening Stock Level</th>
-            <th>Incoming Stock</th>
-            <th>Outgoing Stock</th>
-            <th>Closing Stock Level</th>
-            <th>Opening Stock Value</th>
-            <th>Closing Stock Value</th>
-            <th>Gross Profit</th>
+            <th class="right">Opening Stock Level</th>
+            <th class="right">Incoming Stock</th>
+            <th class="right">Conversions From</th>
+            <th class="right">Conversions To</th>
+            <th class="right">Adjustments</th>
+            <th class="right">Closing Stock Level</th>
+            <th class="right">Outgoing Stock</th>
+            <th class="right"><b>Sold Stock</b></th>
         </tr>
     </thead>
     <tbody>
         {% for row in original.inventory_balances %}
         <tr>
             <td>{{ row.product.name }}</td>
-            <td>{{ row.opening_stock_level|floatformat:3 }} {{row.product.unit}}</td>
-            <td>{{ row.incoming_stock|floatformat:3 }} {{row.product.unit}}</td>
-            <td>{{ row.outgoing_stock|floatformat:3 }} {{row.product.unit}}</td>
-            <td>{{ row.closing_stock_level|floatformat:3 }} {{row.product.unit}}</td>
-            <td>${{ row.opening_stock_value|floatformat:2 }}</td>
-            <td>${{ row.closing_stock_value|floatformat:2 }}</td>
-            <td>${{ row.gross_profit|floatformat:2 }}</td>
+            <td class="right">{{ row.opening_stock_level|floatformat:3 }} {{row.product.unit}}</td>
+            <td class="right">{{ row.incoming_stock|floatformat:3 }} {{row.product.unit}}</td>
+            <td class="right">{{ row.conversions_from|floatformat:3 }} {{row.product.unit}}</td>
+            <td class="right">{{ row.conversions_to|floatformat:3 }} {{row.product.unit}}</td>
+            <td class="right">{{ row.adjustments|floatformat:3 }} {{row.product.unit}}</td>
+            <td class="right">{{ row.closing_stock_level|floatformat:3 }} {{row.product.unit}}</td>
+            <td class="right">{{ row.outgoing_stock|floatformat:3 }} {{row.product.unit}}</td>
+            <td class="right"><b>{{ row.sold_stock|floatformat:3 }} {{row.product.unit}}</b></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Inventory Performance</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th class="right"><b>Sales</b></th>
+            <th class="right">Opening Inventory</th>
+            <th class="right">Purchases</th>
+            <th class="right">Conversions To</th>
+            <th class="right">Closing Inventory</th>
+            <th class="right"><b>Cost of Goods Sold</b></th>
+            <th class="right">Conversions From</th>
+            <th class="right">Average Unit Cost</th>
+            <th class="right">Average Unit Cost Adjusted</th>
+            <th class="right">Average Unit Price</th>
+            <th class="right">Average Unit Profit</th>
+            <th class="right"><b>Gross Profit</b></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in original.product_performances %}
+        <tr>
+            <td>{{ row.product.name }}</td>
+            <td class="right"><b>${{ row.sales|floatformat:2 }}</b></td>
+            <td class="right">${{ row.opening_stock_value|floatformat:2 }}</td>
+            <td class="right">${{ row.purchases|floatformat:2 }}</td>
+            <td class="right">${{ row.conversions_to|floatformat:2 }}</td>
+            <td class="right">${{ row.closing_stock_value|floatformat:2 }}</td>
+            <td class="right"><b>${{ row.cost_of_goods_sold|floatformat:2 }}</b></td>
+            <td class="right">${{ row.conversions_from|floatformat:2 }}</td>
+            <td class="right">${{ row.average_unit_cost|floatformat:2 }}</td>
+            <td class="right">${{ row.average_unit_cost_with_adjustments|floatformat:2 }}</td>
+            <td class="right">${{ row.average_unit_price|floatformat:2 }}</td>
+            <td class="right">${{ row.average_unit_profit|floatformat:2 }}</td>
+            <td class="right"><b>${{ row.gross_profit|floatformat:2 }}</b></td>
         </tr>
         {% endfor %}
     </tbody>

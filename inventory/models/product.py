@@ -51,11 +51,11 @@ class Product(models.Model):
             qs.filter(date_received__lt=timezone.now())
             .annotate_batch_quantities()
             .filter_empty_batches()
-            .aggregate(total=Sum('quantity_remaining'))['total'] or 0
+            .aggregate(total=Sum('outstanding'))['total'] or 0
         )
     
     @property
-    def stock_value(self, date=None):
+    def stock_value(self):
         """
         Calculate the product's stock value using DB-level aggregation.
         For each batch received before `date`, this computes:
@@ -64,23 +64,7 @@ class Product(models.Model):
         - PurchaseItem, StockAdjustment, or StockConversion.
         Only batches with a positive net quantity are included.
         """
-        from inventory.models.stock_batch import StockBatchQuerySet
-
-        if date is None:
-            date = timezone.now()
-
-        qs: StockBatchQuerySet = self.batches
-
-        return (
-            qs.filter(date_received__lt=date)
-            .annotate_batch_quantities()
-            .filter_empty_batches()
-            .annotate_batch_costs()
-            .annotate_batch_values()
-            .aggregate(
-                total_value=Coalesce(Sum('batch_value'), Value(Decimal('0.0')))
-            )['total_value'] or 0
-        )
+        return self.get_stock_value_at(timezone.now())
     
     @cached_property
     def batches(self) -> QuerySet:
@@ -265,15 +249,34 @@ class Product(models.Model):
         """
         Calculate stock value at a specific date.
         """
-        total_value = Decimal('0.0')
+        from inventory.models.stock_batch import StockBatchQuerySet
+        from inventory.models.batch_movement import BatchMovement
+        qs: StockBatchQuerySet = self.batches
+        qs = qs.filter(date_received__lt=date)
+        qs = qs.annotate(
+            outstanding=Coalesce(
+                Sum(
+                    Case(
+                        When(
+                            movements__movement_type=BatchMovement.MovementType.IN,
+                            movements__date__lt=date,
+                            then=F('movements__quantity')),
+                        When(
+                            movements__movement_type=BatchMovement.MovementType.OUT,
+                            movements__date__lt=date,
+                            then=-F('movements__quantity')),
+                        default=Value(Decimal('0.0')),
+                    )
+                ),
+                Value(Decimal('0.0')),
+            ),  
+        )
+        qs = qs.filter_empty_batches()
+        qs = qs.annotate_batch_costs()
+        qs = qs.annotate_batch_values()
+        qs = qs.aggregate(total_value=Coalesce(Sum('batch_value'), Value(Decimal('0.0'))))
 
-        for batch in self.batches:
-            if batch.date_received < date:
-                qty = batch.get_quantity_remaining(date)
-                cost = batch.unit_cost
-                total_value += (qty * cost)
-
-        return total_value
+        return qs['total_value'] or 0
     
     def is_below_minimum_stock(self):
         return self.stock_level < self.minimum_stock_level
@@ -308,7 +311,7 @@ class Product(models.Model):
                     F('total_in') - F('total_out'),
                     output_field=DecimalField(max_digits=10, decimal_places=3)
                 ),
-            ).filter(in_stock__gte=0.001).earliest('date_received')
+            ).filter(in_stock__gt=0).earliest('date_received')
 
             if batch is None:
                 raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
@@ -354,9 +357,10 @@ class Product(models.Model):
         Sales - Cost of goods sold (opening stock value + purchases - closing stock value)
         """
         sales = self.get_total_sales_between(start_date, end_date)
-        cost_of_goods_sold = self.get_cost_of_goods_sold(start_date, end_date)
+        conversions_from = self.get_conversions_from_value_between(start_date, end_date)
+        cost_of_goods_sold = self.get_cost_of_goods_sold_between(start_date, end_date)
         
-        return sales - cost_of_goods_sold
+        return sales + conversions_from - cost_of_goods_sold
     
     def get_total_sales_between(self, start_date, end_date):
         """
@@ -371,32 +375,39 @@ class Product(models.Model):
                 )
             ).aggregate(total=models.Sum('line_total'))['total'] or 0
     
-    def get_cost_of_goods_sold(self, start_date, end_date):
+    def get_cost_of_goods_sold_between(self, start_date, end_date):
         """
         Get cost of goods sold between two dates
         """
         opening_stock_value = self.get_stock_value_at(start_date)
         closing_stock_value = self.get_stock_value_at(end_date)
         purchases = self.get_total_purchases_between(start_date, end_date)
-        conversions_in = self.get_conversions_in_between(start_date, end_date)
-        conversions_out = self.get_conversions_out_between(start_date, end_date)
+        conversions_to = self.get_conversions_to_value_between(start_date, end_date)
         
-        return opening_stock_value + purchases + conversions_in - closing_stock_value - conversions_out
-
-    def get_conversions_out_between(self, start_date, end_date):
+        return (
+            opening_stock_value + 
+            conversions_to +
+            purchases -
+            closing_stock_value
+        )
+    
+    def get_conversions_from_quantity_between(self, start_date, end_date):
         """
         Get all stock conversions in between two dates.
         """
         return self.conversions_from.filter(
             date__range=[start_date, end_date],
-        ).annotate(
-            line_total=ExpressionWrapper(
-                F('quantity') * F('unit_cost'),
-                output_field=DecimalField(max_digits=10, decimal_places=3)
-            )
-        ).aggregate(total=models.Sum('line_total'))['total'] or 0
+        ).aggregate(total=models.Sum('quantity'))['total'] or 0
     
-    def get_conversions_in_between(self, start_date, end_date):
+    def get_conversions_to_quantity_between(self, start_date, end_date):
+        """
+        Get all stock conversions in between two dates.
+        """
+        return self.conversions_to.filter(
+            date__range=[start_date, end_date],
+        ).aggregate(total=models.Sum('quantity'))['total'] or 0
+    
+    def get_conversions_to_value_between(self, start_date, end_date):
         """
         Get all stock conversions in between two dates.
         """
@@ -408,3 +419,90 @@ class Product(models.Model):
                 output_field=DecimalField(max_digits=10, decimal_places=3)
             )
         ).aggregate(total=models.Sum('line_total'))['total'] or 0
+    
+    def get_conversions_from_value_between(self, start_date, end_date):
+        """
+        Get all stock conversions in between two dates.
+        """
+        return self.conversions_from.filter(
+            date__range=[start_date, end_date],
+        ).annotate(
+            line_total=ExpressionWrapper(
+                F('quantity') * F('unit_cost'),
+                output_field=DecimalField(max_digits=10, decimal_places=3)
+            )
+        ).aggregate(total=models.Sum('line_total'))['total'] or 0
+
+    def get_average_unit_cost_between(self, start_date, end_date):
+        """
+        Get average cost between two dates.
+        """
+        total_cost = self.get_total_purchases_between(start_date, end_date)
+        total_weight = self.purchase_items.filter(
+            purchase__date__range=[start_date, end_date],
+            product=self,
+        ).aggregate(
+            total_weight=models.Sum('quantity')
+        )['total_weight'] or 0
+
+        if total_weight == 0:
+            return 0
+        
+        return total_cost / total_weight
+    
+    
+    def get_average_unit_price_between(self, start_date, end_date):
+        """
+        Calculate the average unit price of sales for this product between two dates.
+
+        Args:
+            start_date: The start date of the period to calculate the average unit price.
+            end_date: The end date of the period to calculate the average unit price.
+
+        Returns:
+            The average unit price as a decimal value, or 0 if no sales were found in the given period.
+        """
+
+        from inventory.models import SaleItem
+
+        return SaleItem.objects.filter(
+            sale__date__range=[start_date, end_date],
+            product=self,
+        ).aggregate(
+            average_cost=models.Avg('unit_price')
+        )['average_cost'] or 0
+        
+    def get_adjustments_between(self, start_date, end_date):
+        return self.adjustments.filter(
+            date__range=[start_date, end_date]
+        ).aggregate(total=models.Sum('quantity'))['total'] or 0
+    
+    def get_average_unit_cost_with_adjustments_between(self, start_date, end_date):
+        from inventory.models import PurchaseItem
+
+        total_weight = PurchaseItem.objects.filter(
+            purchase__date__range=[start_date, end_date],
+            product=self,
+        ).aggregate(
+            total_weight=models.Sum('quantity')
+        )['total_weight'] or 0
+       
+        total_cost = self.get_total_purchases_between(start_date, end_date)
+        
+        adjusted_weight = self.get_adjustments_between(start_date, end_date)
+
+        if (total_weight + adjusted_weight) == 0:
+            return 0
+        
+        return total_cost / (total_weight + adjusted_weight)
+
+    def get_average_unit_profit_between(self, start_date, end_date):
+        return (
+            self.get_average_unit_price_between(start_date, end_date) - 
+            self.get_average_unit_cost_with_adjustments_between(start_date, end_date)
+        )
+    
+    def get_sold_quantity_between(self, start_date, end_date):
+        return self.sale_items.filter(
+            sale__date__range=[start_date, end_date]
+        ).aggregate(total=models.Sum('quantity'))['total'] or 0

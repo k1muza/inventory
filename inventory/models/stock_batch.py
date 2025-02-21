@@ -23,23 +23,19 @@ class StockBatchQuerySet(models.QuerySet):
             total_in=Coalesce(
                 Sum(
                     Case(
-                        When(movements__movement_type=BatchMovement.MovementType.IN, then=F('movements__quantity')),
+                        When(
+                            movements__movement_type=BatchMovement.MovementType.IN, 
+                            then=F('movements__quantity')),
+                        When(
+                            movements__movement_type=BatchMovement.MovementType.OUT, 
+                            then=-F('movements__quantity')),
                         default=Value(Decimal('0.0')),
                     ),
+                    default=Value(Decimal('0.0')),
                 ),
-                Value(Decimal('0.0')),
-            ),
-            total_out=Coalesce(
-                Sum(
-                    Case(
-                        When(movements__movement_type=BatchMovement.MovementType.OUT, then=F('movements__quantity')),
-                        default=Value(Decimal('0.0')),
-                    )
-                ),
-                Value(Decimal('0.0')),
             ),
         ).annotate(
-            quantity_remaining=F('total_in') - F('total_out')
+            outstanding=F('total_in') - F('total_out')
         )
     
     def annotate_batch_costs(self):
@@ -83,25 +79,25 @@ class StockBatchQuerySet(models.QuerySet):
         Annotate the queryset with the total value of each batch.
 
         This function adds an annotation to the queryset:
-        - batch_value: The total value of each batch, calculated as quantity_remaining * effective_unit_cost.
+        - batch_value: The total value of each batch, calculated as outstanding * effective_unit_cost.
 
-        The annotation is calculated using an ExpressionWrapper that multiplies the quantity_remaining
+        The annotation is calculated using an ExpressionWrapper that multiplies the outstanding
         and effective_unit_cost fields of each batch object. The result is a DecimalField with a
         precision of up to 15 digits and 2 decimal places.
         """
         return self.annotate(
             batch_value=ExpressionWrapper(
-                F('quantity_remaining') * F('effective_unit_cost'),
+                F('outstanding') * F('effective_unit_cost'),
                 output_field=DecimalField(max_digits=15, decimal_places=2),
             )
         )
     
     def filter_empty_batches(self):
         """
-        Filter out batches with a quantity_remaining of 0.0.
+        Filter out batches with a outstanding of 0.0.
         """
 
-        return self.filter(quantity_remaining__gt=Decimal('0.0'))
+        return self.filter(outstanding__gt=Decimal('0.0'))
 
 class StockBatch(models.Model):
     date_received = models.DateTimeField(default=timezone.now)

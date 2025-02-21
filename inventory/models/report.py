@@ -164,13 +164,42 @@ class Report(models.Model):
                     'closing_stock_level': product.get_stock_level_at(self.close_date),
                     'opening_stock_value': product.get_stock_value_at(self.open_date),
                     'closing_stock_value': product.get_stock_value_at(self.close_date),
+                    'adjustments': product.get_adjustments_between(self.open_date, self.close_date),
                     'incoming_stock': product.get_incoming_stock_between(self.open_date, self.close_date),
+                    'conversions_from': product.get_conversions_from_quantity_between(self.open_date, self.close_date),
+                    'conversions_to': product.get_conversions_to_quantity_between(self.open_date, self.close_date),
                     'outgoing_stock': product.get_outgoing_stock_between(self.open_date, self.close_date),
-                    'sales': product.get_total_sales_between(self.open_date, self.close_date),
-                    'cost_of_goods_sold': product.get_cost_of_goods_sold(self.open_date, self.close_date),
-                    'gross_profit': product.get_gross_profit_between(self.open_date, self.close_date),
+                    'sold_stock': product.get_sold_quantity_between(self.open_date, self.close_date),
                 })
         return inventory
+    
+
+    @property
+    def product_performances(self):
+        from inventory.models import Product
+        perfomances = []
+        for product in Product.objects.all():
+            if product.get_stock_level_at(self.open_date) or \
+                product.get_stock_level_at(self.close_date) or \
+                product.get_outgoing_stock_between(self.open_date, self.close_date) or \
+                product.get_incoming_stock_between(self.open_date, self.close_date):
+                perfomances.append({
+                    'product': product,
+                    'sales': product.get_total_sales_between(self.open_date, self.close_date),
+                    'opening_stock_value': product.get_stock_value_at(self.open_date),
+                    'purchases': product.get_total_purchases_between(self.open_date, self.close_date),
+                    'closing_stock_value': product.get_stock_value_at(self.close_date),
+                    'cost_of_goods_sold': product.get_cost_of_goods_sold_between(self.open_date, self.close_date),
+                    'gross_profit': product.get_gross_profit_between(self.open_date, self.close_date),
+                    'conversions_from': product.get_conversions_from_value_between(self.open_date, self.close_date),
+                    'conversions_to': product.get_conversions_to_value_between(self.open_date, self.close_date),
+                    'average_unit_cost_with_adjustments': product.get_average_unit_cost_with_adjustments_between(self.open_date, self.close_date),
+                    'average_unit_cost': product.get_average_unit_cost_between(self.open_date, self.close_date),
+                    'adjustments': product.get_adjustments_between(self.open_date, self.close_date),
+                    'average_unit_price': product.get_average_unit_price_between(self.open_date, self.close_date),
+                    'average_unit_profit': product.get_average_unit_profit_between(self.open_date, self.close_date),
+                })
+        return perfomances
 
     def get_stock_value_at(self, date):
         from inventory.models import StockBatch, BatchMovement, PurchaseItem, StockAdjustment, StockConversion  
