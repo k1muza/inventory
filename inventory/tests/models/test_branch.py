@@ -43,7 +43,7 @@ def test_lot_movements_on_sale(
     assert first.batch.quantity_remaining == 0
     assert second.batch.quantity_remaining == 0
     assert third.batch.quantity_remaining == 10
-    assert not third.batch.is_empty
+    assert third.batch.in_stock
 
 
 @pytest.mark.django_db

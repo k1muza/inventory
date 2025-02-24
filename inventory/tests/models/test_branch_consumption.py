@@ -11,7 +11,7 @@ def test_lot_consumption_on_sale_date(
     purchase_item = purchase_item_factory(product=product, quantity=100)
     sale_item = sale_item_factory(product=product, quantity=100)
     assert purchase_item.batches.last().quantity_remaining == 0
-    assert purchase_item.batches.last().is_empty
+    assert not purchase_item.batches.last().in_stock
     assert purchase_item.batches.last().movements.count() == 2
     assert purchase_item.batches.last().movements.last().date == sale_item.sale.date
 
