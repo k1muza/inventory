@@ -26,7 +26,7 @@ def test_batch_consumption_on_sale(
         object_id=purchase_item.id
     )
     assert batch.quantity_remaining == 0
-    assert batch.is_empty
+    assert not batch.in_stock
 
 
 @pytest.mark.django_db

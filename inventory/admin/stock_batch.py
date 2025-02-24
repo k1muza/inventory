@@ -5,6 +5,24 @@ from django.http import HttpResponseRedirect
 from inventory.models import BatchMovement, StockBatch, PurchaseItem, StockAdjustment, StockConversion, SaleItem
 
 
+class InStockFilter(admin.SimpleListFilter):
+    title = 'In Stock'
+    parameter_name = 'in_stock'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('true', 'True'),
+            ('false', 'False'),
+        )
+
+    def queryset(self, request, queryset):
+        queryset = queryset.annotate_batch_quantities()
+        if self.value() == 'true':
+            return queryset.filter(outstanding__gt=0.0001)
+        elif self.value() == 'false':
+            return queryset.filter(outstanding__lte=0.0001)
+
+
 class BatchMovementInline(admin.TabularInline):
     model = BatchMovement
     extra = 0
@@ -25,10 +43,10 @@ class BatchAdmin(admin.ModelAdmin):
         'movements',
         'in_stock',
     )
-    list_filter = ('date_received',)
+    list_filter = ('date_received', InStockFilter)
     search_fields = ('product__name',)
     inlines = [BatchMovementInline]
-    readonly_fields = ('quantity_remaining', 'is_empty', 'unit_cost',)
+    readonly_fields = ('quantity_remaining', 'in_stock', 'unit_cost',)
     ordering = ('-date_received',)
 
     @admin.display(description='Product')
@@ -49,7 +67,7 @@ class BatchAdmin(admin.ModelAdmin):
     
     @admin.display(description='In Stock', boolean=True)
     def in_stock(self, obj: StockBatch):
-        return not obj.is_empty
+        return obj.in_stock
     
     @admin.display(description='Movements')
     def movements(self, obj: StockBatch):

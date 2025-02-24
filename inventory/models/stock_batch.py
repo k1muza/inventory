@@ -139,8 +139,8 @@ class StockBatch(models.Model):
         return self.quantity_remaining * self.unit_cost
     
     @property
-    def is_empty(self):
-        return self.quantity_remaining <= 0
+    def in_stock(self):
+        return self.quantity_remaining > 0
     
     @property
     def profit(self):
