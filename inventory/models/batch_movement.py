@@ -23,6 +23,12 @@ class BatchMovement(models.Model):
 
     class Meta:
         verbose_name_plural = 'Batch Movements'
+        constraints = [
+            models.CheckConstraint(
+                name='positive_quantity',
+                check=models.Q(quantity__gt=0)
+            )
+        ]
     
     def __str__(self):
         return f"{self.batch.linked_object.product.name} - {self.quantity} - {self.date.strftime('%Y-%m-%d')}"

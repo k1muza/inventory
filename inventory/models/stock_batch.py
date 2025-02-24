@@ -198,7 +198,7 @@ class StockBatch(models.Model):
         ear_marked = min(quantity, self.quantity_remaining)
         ct = ContentType.objects.get_for_model(type(associated_item))
         
-        if self.quantity_remaining > 0 and ear_marked > 0:
+        if 0 < ear_marked <= self.quantity_remaining:
             self.movements.create(
                 batch=self, 
                 content_type=ct,

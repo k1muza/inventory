@@ -281,60 +281,20 @@ class Product(models.Model):
     def is_below_minimum_stock(self):
         return self.stock_level < self.minimum_stock_level
     
-    def consume_new(self, quantity, sale_item):
+    def consume(self, quantity, sale_item):
         """
         Consume stock from the oldest batch(s) available.
         """
-        from inventory.models import StockBatch, BatchMovement
+        from inventory.models import StockBatch
         remaining = quantity
         while remaining > 0:
-            batch: StockBatch = self.batches.annotate(
-                total_in=Coalesce(
-                    Sum(
-                        Case(
-                            When(movements__movement_type=BatchMovement.MovementType.IN, then=F('movements__quantity')),
-                            default=Value(Decimal('0.0')),
-                        ),
-                    ),
-                    Value(Decimal('0.0')),
-                ),
-                total_out=Coalesce(
-                    Sum(
-                        Case(
-                            When(movements__movement_type=BatchMovement.MovementType.OUT, then=F('movements__quantity')),
-                            default=Value(Decimal('0.0')),
-                        )
-                    ),
-                    Value(Decimal('0.0')),
-                ),
-                in_stock=ExpressionWrapper(
-                    F('total_in') - F('total_out'),
-                    output_field=DecimalField(max_digits=10, decimal_places=3)
-                ),
-            ).filter(in_stock__gt=0).earliest('date_received')
+            batch: StockBatch = self.batches.annotate_batch_quantities().filter(outstanding__gt=0.0001).earliest('date_received')
 
             if batch is None:
                 raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
             
             remaining = batch.consume(remaining, sale_item)
             
-        if remaining > 0.001:
-            raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
-    
-    def consume(self, quantity, sale_item):
-        """
-        Consume stock from the oldest batch(s) available.
-        """
-        remaining = quantity
-        for batch in self.batches.order_by('date_received'):
-            if batch.is_empty:
-                continue
-
-            remaining = batch.consume(remaining, sale_item)
-            
-            if remaining <= 0:
-                break
-
         if remaining > 0.001:
             raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
         
