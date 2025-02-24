@@ -26,7 +26,7 @@ class BatchMovement(models.Model):
         constraints = [
             models.CheckConstraint(
                 name='positive_quantity',
-                check=models.Q(quantity__gt=0)
+                condition=models.Q(quantity__gt=0),
             )
         ]
     
