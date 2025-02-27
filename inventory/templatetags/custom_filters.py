@@ -2,6 +2,7 @@ from django import template
 
 register = template.Library()
 
+
 @register.filter(name='replace')
 def replace(value, args):
     """
@@ -16,6 +17,7 @@ def replace(value, args):
     except ValueError:
         # If the arguments are not correctly formatted, return the original value
         return value
+
 
 @register.filter(name='formatquantity')
 def formatquantity(value, unit):

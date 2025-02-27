@@ -15,15 +15,15 @@ class PurchaseItem(models.Model):
 
     def __str__(self):
         return f"{self.product.name} - {self.purchase.date.strftime('%Y-%m-%d')} - {self.quantity} x {self.unit_cost}"
-    
+
     @property
     def line_total(self):
-        return self.unit_cost*self.quantity if self.quantity and self.unit_cost else 0
-    
+        return self.unit_cost * self.quantity if self.quantity and self.unit_cost else 0
+
     @property
     def name(self):
         return 'Purchase'
-    
+
     @property
     def batch(self):
         return StockBatch.objects.get(

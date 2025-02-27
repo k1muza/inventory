@@ -1,28 +1,25 @@
 from decimal import Decimal
 from django.core.management.base import BaseCommand
-from django.db.models import ExpressionWrapper, OuterRef, Subquery, When, Case, Value, IntegerField, Sum, F, Q
+from django.db.models import ExpressionWrapper, OuterRef, Subquery, When, Case, Value, IntegerField, Sum, F
 from django.utils import timezone
 from datetime import datetime
 from django.utils.timezone import make_aware
 
-from django.contrib.contenttypes.models import ContentType
-
-from inventory.models import BatchMovement, Product, PurchaseItem, StockAdjustment, StockConversion
-from inventory.models.sale_line_item import SaleItem
+from inventory.models import BatchMovement, Product, PurchaseItem, StockAdjustment, StockConversion, SaleItem
 
 
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--product-name', type=str)
-        parser.add_argument('--date', type=str, default=timezone.now().strftime('%Y-%m-%d'))    
+        parser.add_argument('--date', type=str, default=timezone.now().strftime('%Y-%m-%d'))
 
     def handle(self, *args, **options):
         product_name = options['product_name']
         date = make_aware(datetime.strptime(options['date'], '%Y-%m-%d'))
 
         product = Product.objects.get(name=product_name)
-        
+
         qs = BatchMovement.objects.annotate(
             product_id=ExpressionWrapper(
                 Case(
@@ -78,7 +75,7 @@ class Command(BaseCommand):
 
         if qs.exists():
             self.stdout.write(self.style.SUCCESS(f'Product {product_name} has {qs.count()} batch movements'))
-            
+
         total = qs.aggregate(total=Sum(
             Case(
                 When(

@@ -35,10 +35,10 @@ class BatchMovementInline(admin.TabularInline):
 class BatchAdmin(admin.ModelAdmin):
     change_list_template = 'admin/stock_batch_change_list.html'
     list_display = (
-        'date', 
-        'product__name', 
-        'quantity', 
-        'quantity_remaining', 
+        'date',
+        'product__name',
+        'quantity',
+        'quantity_remaining',
         'unit_cost',
         'movements',
         'in_stock',
@@ -64,28 +64,28 @@ class BatchAdmin(admin.ModelAdmin):
     @admin.display(description='Quantity Remaining')
     def quantity_remaining(self, obj: StockBatch):
         return f"{obj.quantity_remaining:.2f} {obj.linked_object.product.unit}"
-    
+
     @admin.display(description='In Stock', boolean=True)
     def in_stock(self, obj: StockBatch):
         return obj.in_stock
-    
+
     @admin.display(description='Movements')
     def movements(self, obj: StockBatch):
         return obj.movements.filter(
             movement_type=BatchMovement.MovementType.OUT
         ).count()
-    
+
     @admin.display(description='Unit Cost')
     def unit_cost(self, obj: StockBatch):
         return f"${obj.linked_object.unit_cost:.2f}"
-    
+
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
             path('batches-recalculate/', self.admin_site.admin_view(self.recalculate_batches), name='batches-recalculate'),
         ]
         return my_urls + urls
-    
+
     def recalculate_batches(self, request):
         StockBatch.objects.all().delete()
 

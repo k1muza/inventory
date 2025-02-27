@@ -15,8 +15,8 @@ class StockMovement(models.Model):
     quantity = models.DecimalField(decimal_places=3, max_digits=15)
     date = models.DateTimeField(default=timezone.now)
     adjustment = models.BooleanField(default=False)
-    
-     # GenericForeignKey fields
+
+    # GenericForeignKey fields
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     linked_object = GenericForeignKey('content_type', 'object_id')
@@ -27,7 +27,6 @@ class StockMovement(models.Model):
 
     def __str__(self):
         return f"{self.get_movement_type_display()} - {self.product.name} - {self.quantity}"
-    
+
     def get_admin_url(self):
         return f'/admin/inventory/stockmovement/{self.id}/change/'
-

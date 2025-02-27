@@ -29,9 +29,9 @@ class StockMovementInline(admin.TabularInline):
             movement_type='OUT',
             date__lte=obj.date
         ).aggregate(total=Sum('quantity'))['total'] or 0
-        
+
         return f"{(stock_in - stock_out):.2f} {obj.product.unit}"
-    
+
     @admin.display(description='Type')
     def type(self, obj):
         """
@@ -39,7 +39,7 @@ class StockMovementInline(admin.TabularInline):
         the linked object if it exists.
         """
         return f"{obj.get_movement_type_display()} ({obj.linked_object.name})" if obj.linked_object else obj.get_movement_type_display()
-    
+
     @admin.display(description='Details')
     def details(self, obj: StockMovement):
         return mark_safe(f'<a href="{obj.get_admin_url()}">View</a>')
@@ -52,7 +52,7 @@ class StockMovementInline(admin.TabularInline):
 
     def has_delete_permission(self, request, obj=None):
         return False  # Prevent deletion from the inline
-    
+
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -60,10 +60,10 @@ class ProductAdmin(admin.ModelAdmin):
     change_list_template = "admin/product_change_list.html"
 
     list_display = (
-        'name', 
+        'name',
         'unit_cost',
         'average_unit_cost',
-        'stock_level', 
+        'stock_level',
         'batch_level',
         'stock_value',
         'days_to_sell_out',
@@ -71,10 +71,10 @@ class ProductAdmin(admin.ModelAdmin):
         'average_gross_profit',
     )
     readonly_fields = (
-        'stock_level', 
-        'stock_value', 
+        'stock_level',
+        'stock_value',
         'batch_level',
-        'average_consumption', 
+        'average_consumption',
         'average_gross_profit',
         'average_unit_cost',
         'is_below_minimum_stock',
@@ -101,11 +101,11 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.display(description="Stock Level")
     def stock_level(self, obj: Product):
         return f"{obj.stock_level:.3f} {obj.unit}"
-    
+
     @admin.display(description="Batch Level")
     def batch_level(self, obj: Product):
         return f"{obj.batch_based_stock_level:.3f} {obj.unit}"
-    
+
     @admin.display(description="Stock Value")
     def stock_value(self, obj: Product):
         return f"${obj.stock_value:.2f}"
@@ -113,19 +113,19 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.display(description="Below Minimum Stock", boolean=True)
     def is_below_minimum_stock(self, obj: Product):
         return obj.is_below_minimum_stock()
-    
+
     @admin.display(description="Av Consumption/Day")
     def average_consumption(self, obj: Product):
         return f"{obj.average_consumption:.3f} {obj.unit}"
-    
+
     @admin.display(description="Av Unit Cost")
     def average_unit_cost(self, obj: Product):
         return f"${obj.average_unit_cost:.2f}"
-    
+
     @admin.display(description="Av Profit/Day")
     def average_gross_profit(self, obj: Product):
         return f"${obj.average_gross_profit:.2f}"
-    
+
     @admin.display(description="Days to Sell Out")
     def days_to_sell_out(self, obj: Product):
         return f"{obj.days_until_stockout:.1f} days"
@@ -227,7 +227,7 @@ class ProductAdmin(admin.ModelAdmin):
         }
 
         return render(request, 'admin/product_sales_report.html', context)
-    
+
     def sales_graph(self, request):
         products = Product.objects.filter(unit='kg')
         line = []
@@ -245,7 +245,7 @@ class ProductAdmin(admin.ModelAdmin):
         }
 
         return render(request, 'admin/product_sales_graph.html', context)
-    
+
     def sales_predictions(self, request):
         from utils.predictor import Predictor
         predictor = Predictor()

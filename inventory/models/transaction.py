@@ -15,7 +15,7 @@ class Transaction(models.Model):
     date = models.DateTimeField(default=timezone.now)
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(max_digits=15, decimal_places=2)
-    
+
     # GenericForeignKey fields
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
@@ -29,11 +29,10 @@ class Transaction(models.Model):
     def item(self):
         from inventory.models import SaleItem, PurchaseItem
         if self.linked_object and hasattr(self.linked_object, 'product'):
-            if type(self.linked_object) == SaleItem:
+            if isinstance(self.linked_object, SaleItem):
                 return f"{self.linked_object.product.name} ({self.linked_object.unit_price} x {self.linked_object.quantity})"
-            elif type(self.linked_object) == PurchaseItem:
+            elif isinstance(self.linked_object, PurchaseItem):
                 return f"{self.linked_object.product.name} ({self.linked_object.unit_cost} x {self.linked_object.quantity})"
         elif self.linked_object and hasattr(self.linked_object, 'description'):
             return self.linked_object.description
         return f"{self.transaction_type} - {self.amount}"
- 

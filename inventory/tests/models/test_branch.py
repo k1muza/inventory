@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.contenttypes.models import ContentType
+
 from inventory.models import StockBatch, PurchaseItem
 
 
@@ -15,7 +16,7 @@ def test_lot_creation_on_purchase_item(purchase_item_factory):
 @pytest.mark.django_db
 def test_batch_consumption_on_sale(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory
 ):
     product = product_factory()
@@ -32,7 +33,7 @@ def test_batch_consumption_on_sale(
 @pytest.mark.django_db
 def test_lot_movements_on_sale(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory
 ):
     product = product_factory()
@@ -49,7 +50,7 @@ def test_lot_movements_on_sale(
 @pytest.mark.django_db
 def test_lot_partial_consumption_on_sale(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory
 ):
     product = product_factory()
@@ -70,7 +71,7 @@ def test_lot_partial_consumption_on_sale(
 @pytest.mark.django_db
 def test_lot_profit(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory,
     cost_per_unit,
     price_per_unit,

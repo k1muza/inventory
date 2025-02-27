@@ -3,6 +3,7 @@ from django.db import models
 
 from inventory.models import SaleItem
 
+
 class Command(BaseCommand):
     help = 'Check and resolve sale quantities'
 

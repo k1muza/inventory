@@ -10,16 +10,15 @@ class StockAdjustment(models.Model):
     date = models.DateTimeField(default=timezone.now)
     reason = models.TextField(blank=True)
 
-    movements = GenericRelation('inventory.BatchMovement', related_query_name='adjustment') # Finish this 
+    movements = GenericRelation('inventory.BatchMovement', related_query_name='adjustment')  # Finish this
     batches = GenericRelation('inventory.StockBatch', related_query_name='adjustment')
 
     def __str__(self):
         return f"{self.product.name} - {self.quantity}"
-    
+
     class Meta:
         verbose_name_plural = 'Stock Adjustments'
 
     @property
     def name(self):
         return 'Adjustment'
-  

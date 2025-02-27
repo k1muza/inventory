@@ -1,9 +1,8 @@
 from django.core.management.base import BaseCommand
 
-from inventory.models import StockAdjustment, StockBatch, SaleItem, PurchaseItem, StockConversion
-from inventory.models.batch_movement import BatchMovement
-from inventory.models.stock_movement import StockMovement
+from inventory.models import StockAdjustment, StockBatch, SaleItem, PurchaseItem, StockConversion, BatchMovement, StockMovement
 from utils.decorators import timer
+
 
 class Command(BaseCommand):
     help = 'Recreate transactions based on stock movements'

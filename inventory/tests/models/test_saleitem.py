@@ -14,7 +14,7 @@ import pytest
 @pytest.mark.django_db
 def test_saleitem_profit(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory,
     unit_cost,
     unit_price,
@@ -23,13 +23,13 @@ def test_saleitem_profit(
 ):
     product = product_factory()
     purchase_item_factory(
-        product=product, 
-        quantity=quantity, 
+        product=product,
+        quantity=quantity,
         unit_cost=unit_cost
     )
     sale_item = sale_item_factory(
-        product=product, 
-        quantity=quantity, 
+        product=product,
+        quantity=quantity,
         unit_price=unit_price
     )
     assert sale_item.gross_profit == profit
@@ -45,7 +45,7 @@ def test_saleitem_profit(
             1.5,
             20,
             10
-        ), # Partial consumption
+        ),  # Partial consumption
         (
             [
                 (50, 1.0),
@@ -54,7 +54,7 @@ def test_saleitem_profit(
             1.5,
             100,
             40
-        ), # Full consumption with different purchase prices
+        ),  # Full consumption with different purchase prices
         (
             [
                 (50, 1.0),
@@ -63,7 +63,7 @@ def test_saleitem_profit(
             1.0,
             100,
             -10
-        ), # Full consumption with different purchase prices and loss
+        ),  # Full consumption with different purchase prices and loss
         (
             [
                 (50, 1.0),
@@ -73,13 +73,13 @@ def test_saleitem_profit(
             1.25,
             100,
             15
-        ), # Untouched lot with previous consumed lots
+        ),  # Untouched lot with previous consumed lots
     ]
 )
 @pytest.mark.django_db
 def test_saleitem_profit_multiple_movements(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory,
     purchases,
     unit_price,
@@ -89,14 +89,14 @@ def test_saleitem_profit_multiple_movements(
     product = product_factory()
     for quantity, unit_cost in purchases:
         purchase_item_factory(
-            product=product, 
-            quantity=quantity, 
+            product=product,
+            quantity=quantity,
             unit_cost=unit_cost
         )
-    
+
     sale_item = sale_item_factory(
-        product=product, 
-        quantity=sale_quantity, 
+        product=product,
+        quantity=sale_quantity,
         unit_price=unit_price
     )
     assert sale_item.gross_profit == profit

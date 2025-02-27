@@ -1,8 +1,9 @@
+import pytest
 from datetime import datetime
 from inventory.models.batch_movement import BatchMovement
-import pytest
 
-from inventory.models import StockAdjustment, StockBatch, StockMovement
+from inventory.models import StockBatch
+
 
 @pytest.mark.django_db
 def test_stock_adjustment_increases_stock(stock_adjustment_factory):
@@ -18,6 +19,7 @@ def test_stock_adjustment_increases_stock(stock_adjustment_factory):
     assert movement.batch == batch
     assert movement.movement_type == BatchMovement.MovementType.IN
     assert movement.quantity == 10
+
 
 @pytest.mark.django_db
 def test_stock_adjustment_decreases_stock(product_factory, stock_adjustment_factory, purchase_item_factory):

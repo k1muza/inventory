@@ -7,7 +7,7 @@ from inventory.models.stock_batch import StockBatch
 @pytest.mark.django_db
 def test_stock_conversion_consumes_batch(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     stock_conversion_factory
 ):
     from_product = product_factory(name="Beef", unit="kg")
@@ -15,8 +15,8 @@ def test_stock_conversion_consumes_batch(
 
     purchase_item = purchase_item_factory(product=from_product, quantity=100, purchase__date=datetime(2022, 1, 1))
     stock_conversion = stock_conversion_factory(
-        from_product=from_product, 
-        to_product=to_product, 
+        from_product=from_product,
+        to_product=to_product,
         unit_cost=purchase_item.unit_cost,
         quantity=20,
         date=purchase_item.purchase.date + timezone.timedelta(days=1)

@@ -12,7 +12,7 @@ def on_purchase_item_save(sender, instance: PurchaseItem, created, **kwargs):
     purchase_ct = ContentType.objects.get_for_model(PurchaseItem)
     if instance.quantity <= 0:
         return
-    
+
     StockMovement.objects.update_or_create(
         content_type=purchase_ct,
         object_id=instance.id,
@@ -23,7 +23,7 @@ def on_purchase_item_save(sender, instance: PurchaseItem, created, **kwargs):
             "date": instance.purchase.date,
         }
     )
-    
+
     StockBatch.objects.update_or_create(
         content_type=purchase_ct,
         object_id=instance.id,
@@ -65,7 +65,7 @@ def on_purchase_item_delete(sender, instance: PurchaseItem, **kwargs):
 def on_sale_item_save(sender, instance: SaleItem, created, **kwargs):
     if instance.quantity <= 0:
         return
-    
+
     saleitem_ct = ContentType.objects.get_for_model(SaleItem)
     StockMovement.objects.update_or_create(
         content_type=saleitem_ct,
@@ -130,7 +130,7 @@ def on_stock_adjustment_save(sender, instance: StockAdjustment, created, **kwarg
     instance.batches.all().delete()
 
     adjustment_ct = ContentType.objects.get_for_model(StockAdjustment)
-    
+
     if instance.quantity > 0:
         StockBatch.objects.update_or_create(
             content_type=adjustment_ct,

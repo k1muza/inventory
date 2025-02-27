@@ -1,8 +1,7 @@
 from django.db import models
 from django.utils import timezone
-from django.db.models import F, ExpressionWrapper, DecimalField
+from django.db.models import F, ExpressionWrapper, DecimalField, Case, When, Value, Subquery, OuterRef, Sum
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Case, When, Value, Subquery, OuterRef, Sum
 
 
 class Sale(models.Model):
@@ -11,7 +10,7 @@ class Sale(models.Model):
 
     def __str__(self):
         return f"Sale {self.id} on {self.date.strftime('%Y-%m-%d')}"
-    
+
     @property
     def total_amount(self):
         return self.items.annotate(
@@ -22,7 +21,7 @@ class Sale(models.Model):
         ).aggregate(
             total_revenue=Sum('line_total')
         )['total_revenue'] or 0
-    
+
     @property
     def movements(self):
         from inventory.models import BatchMovement, SaleItem
@@ -31,7 +30,7 @@ class Sale(models.Model):
             content_type=saleitem_ct,
             object_id__in=[i['id'] for i in self.items.values('id')]
         )
-    
+
     @property
     def cost_of_goods_sold(self):
         from inventory.models import PurchaseItem, StockAdjustment, StockConversion
@@ -70,18 +69,18 @@ class Sale(models.Model):
                 output_field=DecimalField(max_digits=10, decimal_places=2)
             )
         )
-        
+
         # Sum those costs across all movements
         total_cost = movements_with_cost.aggregate(
             total=Sum('total_movement_cost')
         )['total'] or 0
-        
+
         return total_cost
-        
+
     @property
     def gross_profit(self):
         return self.total_amount - self.cost_of_goods_sold
-    
+
     @property
     def gross_margin(self):
         return self.gross_profit / self.total_amount if self.total_amount else 0

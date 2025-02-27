@@ -24,10 +24,10 @@ class StockBatchQuerySet(models.QuerySet):
                 Sum(
                     Case(
                         When(
-                            movements__movement_type=BatchMovement.MovementType.IN, 
+                            movements__movement_type=BatchMovement.MovementType.IN,
                             then=F('movements__quantity')),
                         When(
-                            movements__movement_type=BatchMovement.MovementType.OUT, 
+                            movements__movement_type=BatchMovement.MovementType.OUT,
                             then=-F('movements__quantity')),
                         default=Value(Decimal('0.0')),
                     ),
@@ -35,7 +35,7 @@ class StockBatchQuerySet(models.QuerySet):
                 Value(Decimal('0.0')),
             ),
         )
-    
+
     def annotate_unit_costs(self):
         """
         Annotate the queryset with the effective unit cost based on the linked object type.
@@ -56,22 +56,22 @@ class StockBatchQuerySet(models.QuerySet):
         return self.annotate(
             effective_unit_cost=Case(
                 When(
-                    content_type=ContentType.objects.get_for_model(PurchaseItem), 
+                    content_type=ContentType.objects.get_for_model(PurchaseItem),
                     then=Subquery(PurchaseItem.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])
                 ),
                 When(
-                    content_type=ContentType.objects.get_for_model(StockAdjustment), 
+                    content_type=ContentType.objects.get_for_model(StockAdjustment),
                     then=Subquery(StockAdjustment.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])
                 ),
                 When(
-                    content_type=ContentType.objects.get_for_model(StockConversion), 
+                    content_type=ContentType.objects.get_for_model(StockConversion),
                     then=Subquery(StockConversion.objects.filter(pk=OuterRef('object_id')).values('unit_cost')[:1])
                 ),
                 default=Value(0),
                 output_field=DecimalField(max_digits=15, decimal_places=6),
             )
         )
-    
+
     def annotate_remaining_values(self):
         """
         Annotate the queryset with the total value of each batch.
@@ -89,13 +89,14 @@ class StockBatchQuerySet(models.QuerySet):
                 output_field=DecimalField(max_digits=15, decimal_places=2),
             )
         )
-    
+
     def filter_empty_batches(self):
         """
         Filter out batches with a outstanding of 0.0.
         """
 
         return self.filter(outstanding__gt=Decimal('0.0'))
+
 
 class StockBatch(models.Model):
     date_received = models.DateTimeField(default=timezone.now)
@@ -117,7 +118,7 @@ class StockBatch(models.Model):
 
     def __str__(self):
         return f"{self.date_received.date()} - {self.linked_object.product.name} - {self.linked_object.quantity} {self.linked_object.product.unit}"
-    
+
     @property
     def product(self):
         return self.linked_object.product
@@ -125,23 +126,23 @@ class StockBatch(models.Model):
     @property
     def quantity(self):
         return self.linked_object.quantity
-    
+
     @property
     def unit_cost(self):
         return self.linked_object.unit_cost
-    
+
     @property
     def quantity_remaining(self):
         return self.get_quantity_remaining()
-    
+
     @property
     def quantity_remaining_cost(self):
         return self.quantity_remaining * self.unit_cost
-    
+
     @property
     def in_stock(self):
         return self.quantity_remaining > 0
-    
+
     @property
     def profit(self):
         """
@@ -165,7 +166,7 @@ class StockBatch(models.Model):
             movements
             .filter(
                 content_type=ContentType.objects.get_for_model(SaleItem)
-            )  
+            )
             .annotate(
                 total_revenue=ExpressionWrapper(
                     F('quantity') * F('sale_price'),
@@ -184,8 +185,8 @@ class StockBatch(models.Model):
         )
 
         unit_cost = self.linked_object.unit_cost
-        return revenue_aggregation - (unit_cost * Decimal(quantity_aggregation))  
-    
+        return revenue_aggregation - (unit_cost * Decimal(quantity_aggregation))
+
     def consume(self, quantity, associated_item):
         """
         Consume stock from this batch.
@@ -197,13 +198,13 @@ class StockBatch(models.Model):
         from inventory.models import BatchMovement
         ear_marked = min(quantity, self.quantity_remaining)
         ct = ContentType.objects.get_for_model(type(associated_item))
-        
+
         if 0 < ear_marked <= self.quantity_remaining:
             self.movements.create(
-                batch=self, 
+                batch=self,
                 content_type=ct,
                 object_id=associated_item.id if associated_item else None,
-                quantity=ear_marked, 
+                quantity=ear_marked,
                 date=associated_item.date or timezone.now(),
                 movement_type=BatchMovement.MovementType.OUT,
             )
@@ -215,7 +216,7 @@ class StockBatch(models.Model):
 
         if not date:
             date = timezone.now()
-            
+
         total_in = self.movements.filter(
             date__lt=date,
             movement_type=BatchMovement.MovementType.IN

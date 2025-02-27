@@ -2,6 +2,7 @@ import factory
 
 from inventory.models import StockBatch, Product, Purchase, Sale, SaleItem
 
+
 class ProductFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Product
@@ -43,7 +44,6 @@ class SaleItemFactory(factory.django.DjangoModelFactory):
     product = factory.SubFactory(ProductFactory)
     quantity = factory.Faker('random_int', min=1, max=100)
     unit_price = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True)
-
 
 
 class BatchFactory(factory.django.DjangoModelFactory):

@@ -9,7 +9,7 @@ class BatchMovement(models.Model):
         IN = 'IN', 'Stock In'
         OUT = 'OUT', 'Stock Out'
         ADJUSTMENT = 'ADJ', 'Adjustment'
-        
+
     batch = models.ForeignKey('inventory.StockBatch', on_delete=models.CASCADE, related_name='movements')
     movement_type = models.CharField(max_length=10, choices=MovementType.choices)
     quantity = models.DecimalField(decimal_places=3, max_digits=15)
@@ -29,18 +29,18 @@ class BatchMovement(models.Model):
                 condition=models.Q(quantity__gt=0),
             )
         ]
-    
+
     def __str__(self):
         return f"{self.batch.linked_object.product.name} - {self.movement_type} - {self.quantity} - {self.date.strftime('%Y-%m-%d')}"
-    
+
     @property
     def cost(self):
         return self.quantity * self.batch.unit_cost
-    
+
     @property
     def revenue(self):
-        return 0 # TODO: Implement this
-    
+        return 0  # TODO: Implement this
+
     @property
     def profit(self):
         return self.revenue - self.cost

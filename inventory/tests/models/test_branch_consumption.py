@@ -4,7 +4,7 @@ import pytest
 @pytest.mark.django_db
 def test_lot_consumption_on_sale_date(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory
 ):
     product = product_factory()
@@ -19,7 +19,7 @@ def test_lot_consumption_on_sale_date(
 @pytest.mark.django_db
 def test_fifo_lot_consumption_on_sale(
     product_factory,
-    purchase_item_factory, 
+    purchase_item_factory,
     sale_item_factory
 ):
     product = product_factory()

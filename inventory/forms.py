@@ -1,7 +1,6 @@
 from django.utils import timezone
 from django import forms
 
-from inventory.models import StockBatch
 
 class StockAdjustmentForm(forms.Form):
     stock_data = forms.CharField(

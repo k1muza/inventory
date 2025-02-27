@@ -80,7 +80,7 @@ class Predictor:
         if not df.empty:
             # Rename the columns for Prophet
             df.rename(columns={'sale__date': 'ds', 'final_quantity': 'y'}, inplace=True)
-            
+
             # Convert ds to datetime
             df['ds'] = pd.to_datetime(df['ds'], errors='coerce')
 
@@ -95,20 +95,20 @@ class Predictor:
             df = pd.DataFrame(columns=['ds', 'y'])
 
         return df
-    
+
     def build_prophet_model(self, df):
         # Create a Prophet instance
         model = Prophet(
             weekly_seasonality=True,  # captures day-of-week effects
-            yearly_seasonality=False, # set to True if you suspect yearly patterns
+            yearly_seasonality=False,  # set to True if you suspect yearly patterns
             daily_seasonality=False,  # usually not needed unless you have sub-daily data
             growth='logistic'         # use logistic growth for bounded growth
         )
-        
+
         # Fit the model
         model.fit(df)
         return model
-    
+
     def make_forecast(self, model, days=12):
         # Create a DataFrame with future dates
         future = model.make_future_dataframe(periods=days)
@@ -125,7 +125,7 @@ class Predictor:
         end_date = SaleItem.objects.filter(product=product).latest('sale__date').sale.date
         start_date = SaleItem.objects.filter(product=product).earliest('sale__date').sale.date
         df = self.build_dataframe_for_prophet(product, start_date, end_date)
-        
+
         # Prophet expects columns ['ds', 'y']
         # Make sure df has these columns, possibly rename
         df = df.rename(columns={'ds': 'ds', 'y': 'y'})
