@@ -8,7 +8,7 @@ from django.db.models.functions import Coalesce
 
 
 class StockBatchQuerySet(models.QuerySet):
-    def annotate_batch_quantities(self):
+    def annotate_remaining_quantities(self):
         """
         Annotate the queryset with the total quantity received and the total
         quantity despatched for each batch, and the quantity remaining.
@@ -36,7 +36,7 @@ class StockBatchQuerySet(models.QuerySet):
             ),
         )
     
-    def annotate_batch_costs(self):
+    def annotate_unit_costs(self):
         """
         Annotate the queryset with the effective unit cost based on the linked object type.
 
@@ -72,7 +72,7 @@ class StockBatchQuerySet(models.QuerySet):
             )
         )
     
-    def annotate_batch_values(self):
+    def annotate_remaining_values(self):
         """
         Annotate the queryset with the total value of each batch.
 

@@ -16,7 +16,7 @@ class InStockFilter(admin.SimpleListFilter):
         )
 
     def queryset(self, request, queryset):
-        queryset = queryset.annotate_batch_quantities()
+        queryset = queryset.annotate_remaining_quantities()
         if self.value() == 'true':
             return queryset.filter(outstanding__gt=0.0001)
         elif self.value() == 'false':

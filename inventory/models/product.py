@@ -3,13 +3,11 @@ from decimal import Decimal
 import math
 from django.db import models
 from django.utils import timezone
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count, Case, When, Value, Subquery, OuterRef, QuerySet
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count, Case, When, Value, QuerySet
 from django.db.models.functions import Coalesce
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-
-from utils.decorators import timer
 
 
 class Product(models.Model):
@@ -49,7 +47,7 @@ class Product(models.Model):
                
         return (
             qs.filter(date_received__lt=timezone.now())
-            .annotate_batch_quantities()
+            .annotate_remaining_quantities()
             .filter_empty_batches()
             .aggregate(total=Sum('outstanding'))['total'] or 0
         )
@@ -64,7 +62,7 @@ class Product(models.Model):
         - PurchaseItem, StockAdjustment, or StockConversion.
         Only batches with a positive net quantity are included.
         """
-        return self.get_stock_value_at(timezone.now())
+        return self.get_stock_value_at()
     
     @cached_property
     def batches(self) -> QuerySet:
@@ -244,8 +242,8 @@ class Product(models.Model):
         """
         stock_out = self.stock_movements.filter(movement_type='OUT', date__gte=start_date, date__lt=end_date).aggregate(total=models.Sum('quantity'))['total'] or 0
         return stock_out
-    
-    def get_stock_value_at(self, date):
+
+    def get_stock_value_at(self, date=timezone.now()):
         """
         Calculate stock value at a specific date.
         """
@@ -272,8 +270,8 @@ class Product(models.Model):
             ),  
         )
         qs = qs.filter_empty_batches()
-        qs = qs.annotate_batch_costs()
-        qs = qs.annotate_batch_values()
+        qs = qs.annotate_unit_costs()
+        qs = qs.annotate_remaining_values()
         qs = qs.aggregate(total_value=Coalesce(Sum('batch_value'), Value(Decimal('0.0'))))
 
         return qs['total_value'] or 0
@@ -281,22 +279,21 @@ class Product(models.Model):
     def is_below_minimum_stock(self):
         return self.stock_level < self.minimum_stock_level
     
-    def consume(self, quantity, sale_item):
+    def consume(self, quantity, obj):
         """
         Consume stock from the oldest batch(s) available.
         """
         from inventory.models import StockBatch
         remaining = quantity
         while remaining > 0:
-            batch: StockBatch = self.batches.annotate_batch_quantities().filter(outstanding__gt=0.0001).earliest('date_received')
-
+            batch: StockBatch = self.batches.annotate_remaining_quantities().filter(outstanding__gt=0.0001).earliest('date_received')
             if batch is None:
-                raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
+                raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {obj}")
             
-            remaining = batch.consume(remaining, sale_item)
+            remaining = batch.consume(remaining, obj)
             
         if remaining > 0.001:
-            raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {sale_item.sale.date}")
+            raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {obj}")
         
     def get_total_purchases_between(self, start_date, end_date):
         """

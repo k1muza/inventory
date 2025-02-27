@@ -51,3 +51,24 @@ class BatchFactory(factory.django.DjangoModelFactory):
         model = StockBatch
 
     purchase_item = factory.SubFactory(PurchaseItemFactory)
+
+
+class StockConversionFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'inventory.StockConversion'
+
+    from_product = factory.SubFactory(ProductFactory)
+    to_product = factory.SubFactory(ProductFactory)
+    quantity = factory.Faker('random_int', min=1, max=100)
+    date = factory.Faker('date')
+    unit_cost = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True)
+
+
+class StockAdjustmentFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'inventory.StockAdjustment'
+
+    product = factory.SubFactory(ProductFactory)
+    quantity = factory.Faker('random_int', min=1, max=100)
+    date = factory.Faker('date')
+    unit_cost = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True)

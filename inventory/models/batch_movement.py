@@ -31,7 +31,7 @@ class BatchMovement(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.batch.linked_object.product.name} - {self.quantity} - {self.date.strftime('%Y-%m-%d')}"
+        return f"{self.batch.linked_object.product.name} - {self.movement_type} - {self.quantity} - {self.date.strftime('%Y-%m-%d')}"
     
     @property
     def cost(self):

@@ -32,8 +32,12 @@ class StockMovementInline(admin.TabularInline):
         
         return f"{(stock_in - stock_out):.2f} {obj.product.unit}"
     
-    @admin.display(description='Movement Type')
+    @admin.display(description='Type')
     def type(self, obj):
+        """
+        Return a string describing the type of the stock movement, including the name of
+        the linked object if it exists.
+        """
         return f"{obj.get_movement_type_display()} ({obj.linked_object.name})" if obj.linked_object else obj.get_movement_type_display()
     
     @admin.display(description='Details')

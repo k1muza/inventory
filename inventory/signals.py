@@ -132,7 +132,9 @@ def on_stock_adjustment_save(sender, instance: StockAdjustment, created, **kwarg
     adjustment_ct = ContentType.objects.get_for_model(StockAdjustment)
     
     if instance.quantity > 0:
-        instance.batches.get_or_create(
+        StockBatch.objects.update_or_create(
+            content_type=adjustment_ct,
+            object_id=instance.id,
             defaults=dict(
                 date_received=instance.date,
             )
@@ -172,10 +174,7 @@ def on_stock_conversion_save(sender, instance: StockConversion, created, **kwarg
     instance.movements.all().delete()
     instance.batches.all().delete()
 
-    try:
-        instance.from_product.consume(instance.quantity, instance)
-    except ValueError as e:
-        raise ValueError(f"Error consuming product {instance.from_product}: {e}")
+    instance.from_product.consume(instance.quantity, instance)
 
     conversion_ct = ContentType.objects.get_for_model(StockConversion)
     StockMovement.objects.update_or_create(
@@ -216,10 +215,12 @@ def on_stock_conversion_delete(sender, instance: StockConversion, **kwargs):
 @receiver(post_save, sender=StockBatch)
 def on_stock_batch_save(sender, instance: StockBatch, created, **kwargs):
     BatchMovement.objects.update_or_create(
-        batch=instance,
-        quantity=instance.linked_object.quantity,
+        content_type=instance.content_type,
+        object_id=instance.object_id,
         movement_type=BatchMovement.MovementType.IN,
+        batch=instance,
         defaults=dict(
+            quantity=instance.linked_object.quantity,
             date=instance.date_received,
             description=f"Creation of {instance.linked_object.quantity} {instance.linked_object.product.unit} {instance.linked_object.product.name}",
         )

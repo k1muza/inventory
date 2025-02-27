@@ -11,11 +11,11 @@ class StockConversion(models.Model):
     date = models.DateTimeField(default=timezone.now)
     reason = models.TextField(blank=True)
 
-    movements = GenericRelation('inventory.BatchMovement', related_query_name='adjustment') # Finish this 
-    batches = GenericRelation('inventory.StockBatch', related_query_name='adjustment')
+    movements = GenericRelation('inventory.BatchMovement', related_query_name='conversion')
+    batches = GenericRelation('inventory.StockBatch', related_query_name='conversion')
 
     def __str__(self):
-        return f"{self.from_product.name} - {self.to_product.name} - {self.quantity}"
+        return f"{self.quantity}{self.from_product.unit} of {self.from_product.name} -> {self.to_product.name}"
     
     class Meta:
         verbose_name_plural = 'Stock Conversions'
