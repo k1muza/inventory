@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'inventory.apps.InventoryConfig',
+    "django_q",
 ]
 
 MIDDLEWARE = [
@@ -133,3 +134,13 @@ AVERAGE_INTERVAL_DAYS = 7
 REORDER_INTERVAL_DAYS = 7
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
+
+Q_CLUSTER = {
+    "name": "InventoryCluster",
+    "workers": 4,          # Number of worker processes
+    "timeout": 120,         # Seconds before a task is timed out
+    "retry": 180,          # Seconds to wait before retrying a failed task
+    "queue_limit": 50,     # Maximum queued tasks before new tasks are rejected
+    "bulk": 10,            # Number of tasks to process per worker iteration
+    "orm": "default",      # Use Django ORM for broker and result backend
+}

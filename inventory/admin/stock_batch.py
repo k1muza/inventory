@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.urls import path
 from django.http import HttpResponseRedirect
+from django.contrib import messages
 
+from inventory import tasks
 from inventory.models import BatchMovement, StockBatch, PurchaseItem, StockAdjustment, StockConversion, SaleItem
 
 
@@ -87,21 +89,6 @@ class BatchAdmin(admin.ModelAdmin):
         return my_urls + urls
 
     def recalculate_batches(self, request):
-        StockBatch.objects.all().delete()
-
-        for item in PurchaseItem.objects.all():
-            item.save()
-
-        for item in StockAdjustment.objects.all():
-            item.save()
-
-        for item in StockConversion.objects.all():
-            item.save()
-
-        for item in SaleItem.objects.all():
-            item.save()
-
-        self.message_user(request, 'Batches Recalculated')
-
-        # Redirect to batches list
-        return HttpResponseRedirect(request.path)
+        task_id = tasks.trigger_recreate_batches()
+        messages.success(request, f'Recalculating batches in the background task {task_id}')
+        return HttpResponseRedirect('../')
