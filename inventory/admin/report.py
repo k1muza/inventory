@@ -119,7 +119,7 @@ class ReportAdmin(admin.ModelAdmin):
             ),
             path(
                 '<int:object_id>/distribution-report/',
-                self.admin_site.admin_view(self.distribution_report),
+                self.admin_site.admin_view(self.profitability_report),
                 name='distribution-report',
             )
         ]
@@ -179,7 +179,7 @@ class ReportAdmin(admin.ModelAdmin):
         response["Content-Disposition"] = f"attachment; filename={filename}"
         return response
 
-    def distribution_report(self, request, object_id, *args, **kwargs):
+    def profitability_report(self, request, object_id, *args, **kwargs):
         report = get_object_or_404(Report, pk=object_id)
         # Render HTML template
         html_content = render(

@@ -26,8 +26,14 @@
         background: #f4f4f4;
         font-size: 13px;
     }
+    tr:nth-child(even) {
+        background: #f4f4f4;
+    }
     td {
         font-size: 11px;
+    }
+    .right {
+        text-align: right;
     }
     </style>
 </head>
@@ -48,26 +54,24 @@
         <thead>
             <tr>
                 <th>Product</th>
-                <th>Opening Stock</th>
-                <th>Incoming Stock</th>
-                <th>Outgoing Stock</th>
-                <th>Closing Stock</th>
-                <th>Sales</th>
-                <th>COGS</th>
-                <th>Gross Profit</th>
+                <th class="right">Sales</th>
+                <th class="right">Opening Stock</th>
+                <th class="right">Purchases</th>
+                <th class="right">Closing Stock</th>
+                <th class="right">Cost of Goods Sold</th>
+                <th class="right">Gross Profit</th>
             </tr>
         </thead>
         <tbody>
-            {% for row in report.inventory_balances|dictsortreversed:"gross_profit" %}
+            {% for row in report.product_performances|dictsortreversed:"gross_profit" %}
             <tr>
                 <td>{{ row.product.name }}</td>
-                <td>{{ row.opening_stock_level|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
-                <td>{{ row.incoming_stock|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
-                <td>{{ row.outgoing_stock|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
-                <td>{{ row.closing_stock_level|formatquantity:row.product.unit }} {{row.product.unit|replace:"unit,"}}</td>
-                <td>${{ row.sales|floatformat:2 }}</td>
-                <td>${{ row.cost_of_goods_sold|floatformat:2 }}</td>
-                <td><b>${{ row.gross_profit|floatformat:2 }}</b></td>
+                <td class="right"><b>${{ row.sales|floatformat:2 }}</b></td>
+                <td class="right">${{ row.opening_stock_value|floatformat:2  }}</td>
+                <td class="right">${{ row.purchases|floatformat:2  }}</td>
+                <td class="right">${{ row.closing_stock_value|floatformat:2  }}</td>
+                <td class="right"><b>${{ row.cost_of_goods_sold|floatformat:2 }}</b></td>
+                <td class="right"><b>${{ row.gross_profit|floatformat:2 }}</b></td>
             </tr>
             {% empty %}
             <tr>
