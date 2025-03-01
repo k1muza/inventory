@@ -310,7 +310,7 @@ class Product(models.Model):
 
     def get_gross_profit_between(self, start_date, end_date):
         """
-        Calculate gross profit 
+        Calculate gross profit
         Sales - Cost of goods sold (opening stock value + purchases - closing stock value)
         """
         sales = self.get_total_sales_between(start_date, end_date)

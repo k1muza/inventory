@@ -32,7 +32,7 @@ class Command(BaseCommand):
         """
         Deletes all existing stock batches and then recreates them by saving
         all purchase items, stock adjustments, stock conversions, and sale items.
-        Finally, outputs a success message indicating the completion of the batch 
+        Finally, outputs a success message indicating the completion of the batch
         recreation process.
         """
 

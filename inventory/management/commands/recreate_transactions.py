@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from inventory.models import StockMovement, Transaction, SaleItem, PurchaseItem, Expense
 
+
 class Command(BaseCommand):
     help = 'Recreate transactions based on stock movements'
 

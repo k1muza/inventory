@@ -7,7 +7,7 @@ from . import models
 
 
 @strawberry_django.type(models.Product)
-class Product: 
+class Product:
     id: strawberry.ID
     name: typing.Optional[str]
     description: typing.Optional[str]

@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 from inventory.models import Product
 from utils.predictor import Predictor
 
+
 class Command(BaseCommand):
     help = 'Predict sales'
 

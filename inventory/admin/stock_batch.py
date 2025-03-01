@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 from django.contrib import messages
 
 from inventory import tasks
-from inventory.models import BatchMovement, StockBatch, PurchaseItem, StockAdjustment, StockConversion, SaleItem
+from inventory.models import BatchMovement, StockBatch
 
 
 class InStockFilter(admin.SimpleListFilter):

@@ -103,7 +103,7 @@ class Report(models.Model):
             - product name
             - stock level
             - stock value
-        based on the current state of the inventory at the time of close_date 
+        based on the current state of the inventory at the time of close_date
         (or open_date, depending on your needs).
         """
         from inventory.models import Product
@@ -123,7 +123,7 @@ class Report(models.Model):
             - product name
             - stock level
             - stock value
-        based on the current state of the inventory at the time of close_date 
+        based on the current state of the inventory at the time of close_date
         (or open_date, depending on your needs).
         """
         from inventory.models import Product

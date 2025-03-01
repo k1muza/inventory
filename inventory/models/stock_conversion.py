@@ -16,11 +16,10 @@ class StockConversion(models.Model):
 
     def __str__(self):
         return f"{self.quantity}{self.from_product.unit} of {self.from_product.name} -> {self.to_product.name}"
-    
+
     class Meta:
         verbose_name_plural = 'Stock Conversions'
 
     @property
     def product(self):
         return self.to_product
-

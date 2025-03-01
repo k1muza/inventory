@@ -43,11 +43,11 @@ class StockBatchQuerySet(models.QuerySet):
         This function adds an annotation to the queryset:
         - effective_unit_cost: The unit cost determined by the linked content type.
         The annotation is calculated using a Case expression that evaluates the
-        content type of each object in the queryset. The effective unit cost is 
-        retrieved from related models such as PurchaseItem, StockAdjustment, or 
+        content type of each object in the queryset. The effective unit cost is
+        retrieved from related models such as PurchaseItem, StockAdjustment, or
         StockConversion using a Subquery.
 
-        The default value of the effective unit cost is set to 0. The annotation 
+        The default value of the effective unit cost is set to 0. The annotation
         uses a DecimalField with a precision of up to 15 digits and 6 decimal places.
         """
 

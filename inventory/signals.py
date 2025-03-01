@@ -1,7 +1,6 @@
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Sum
 from django.db import transaction
 
 from .models import Expense, StockBatch, BatchMovement, PurchaseItem, SaleItem, StockAdjustment, StockConversion, StockMovement, Transaction
