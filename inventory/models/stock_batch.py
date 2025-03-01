@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
@@ -99,11 +100,12 @@ class StockBatchQuerySet(models.QuerySet):
 
 
 class StockBatch(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     date_received = models.DateTimeField(default=timezone.now)
 
     # GenericForeignKey fields
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_id = models.UUIDField(null=True, blank=True)
     linked_object = GenericForeignKey('content_type', 'object_id')
 
     objects = StockBatchQuerySet.as_manager()

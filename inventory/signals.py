@@ -2,8 +2,11 @@ from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from logging import getLogger
 
 from .models import Expense, StockBatch, BatchMovement, PurchaseItem, SaleItem, StockAdjustment, StockConversion, StockMovement, Transaction
+
+logger = getLogger(__name__)
 
 
 @receiver(post_save, sender=PurchaseItem)
@@ -104,7 +107,7 @@ def consume_batches(sender, instance: SaleItem, created, **kwargs):
     try:
         instance.product.consume(instance.quantity, instance)
     except ValueError as e:
-        print(f"Error consuming product {instance.product}: {e}")
+        logger.error(f"Error consuming product {instance.product}: {e}")
 
 
 @receiver(post_save, sender=Expense)

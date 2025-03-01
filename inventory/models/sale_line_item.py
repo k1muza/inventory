@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 from django.db import models
 from django.db.models import Sum, F, ExpressionWrapper, DecimalField, Subquery, OuterRef, Value, Case, When
 from django.contrib.contenttypes.models import ContentType
@@ -6,6 +7,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 
 
 class SaleItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sale = models.ForeignKey('inventory.Sale', related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey('inventory.Product', on_delete=models.CASCADE, related_name='sale_items')
     quantity = models.DecimalField(decimal_places=3, max_digits=15)

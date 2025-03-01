@@ -1,8 +1,10 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 
 
 class Purchase(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
     is_initial_stock = models.BooleanField(default=False)

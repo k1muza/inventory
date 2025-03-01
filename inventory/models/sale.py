@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.db.models import F, ExpressionWrapper, DecimalField, Case, When, Value, Subquery, OuterRef, Sum
@@ -5,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 
 
 class Sale(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
 

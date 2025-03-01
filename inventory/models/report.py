@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.db.models import DecimalField, Sum, F, ExpressionWrapper, Case, When, Value, Q, Subquery, OuterRef
@@ -7,6 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 
 
 class Report(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     open_date = models.DateTimeField(default=timezone.now)
     close_date = models.DateTimeField(default=timezone.now)
 

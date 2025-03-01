@@ -1,9 +1,11 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.contrib.contenttypes.fields import GenericRelation
 
 
 class StockConversion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     from_product = models.ForeignKey('inventory.Product', related_name='conversions_from', on_delete=models.CASCADE)
     to_product = models.ForeignKey('inventory.Product', related_name='conversions_to', on_delete=models.CASCADE)
     quantity = models.DecimalField(decimal_places=3, max_digits=15)

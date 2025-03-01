@@ -41,7 +41,7 @@ def test_stock_adjustment_decreases_stock(product_factory, stock_adjustment_fact
     assert batch.quantity_remaining == 5
     assert batch.unit_cost == 1.0
     assert BatchMovement.objects.count() == 2
-    movement = BatchMovement.objects.last()
+    movement = BatchMovement.objects.latest('date')
     assert movement.batch == batch
     assert movement.movement_type == BatchMovement.MovementType.OUT
     assert movement.quantity == 5

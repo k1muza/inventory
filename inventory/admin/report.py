@@ -103,17 +103,17 @@ class ReportAdmin(admin.ModelAdmin):
         urls = super().get_urls()
         custom_urls = [
             path(
-                '<int:object_id>/income-statement/',
+                '<str:object_id>/income-statement/',
                 self.admin_site.admin_view(self.download_income_statement),
                 name='income-statement',
             ),
             path(
-                '<int:object_id>/movement-report/',
+                '<str:object_id>/movement-report/',
                 self.admin_site.admin_view(self.movement_report),
                 name='movement-report',
             ),
             path(
-                '<int:object_id>/profitability-report/',
+                '<str:object_id>/profitability-report/',
                 self.admin_site.admin_view(self.profitability_report),
                 name='profitability-report',
             )

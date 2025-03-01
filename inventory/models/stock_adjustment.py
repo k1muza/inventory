@@ -1,9 +1,11 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.contrib.contenttypes.fields import GenericRelation
 
 
 class StockAdjustment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey('inventory.Product', on_delete=models.CASCADE, related_name='adjustments')
     quantity = models.DecimalField(decimal_places=3, max_digits=15)
     unit_cost = models.DecimalField(max_digits=15, decimal_places=6)

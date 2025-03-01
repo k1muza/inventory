@@ -24,8 +24,8 @@ def test_stock_conversion_consumes_batch(
 
     assert StockBatch.objects.count() == 2
 
-    first_batch = StockBatch.objects.first()
-    second_batch = StockBatch.objects.last()
+    first_batch = StockBatch.objects.earliest('date_received')
+    second_batch = StockBatch.objects.latest('date_received')
 
     assert first_batch.product == from_product
     assert second_batch.product == to_product

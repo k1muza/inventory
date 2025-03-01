@@ -133,8 +133,8 @@ class ProductAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('<int:object_id>/sales-report/', self.admin_site.admin_view(self.sales_report), name='product-sales-report'),
-            path('<int:object_id>/download-pdf/', self.admin_site.admin_view(self.download_pdf), name='product-download-pdf'),
+            path('<str:object_id>/sales-report/', self.admin_site.admin_view(self.sales_report), name='product-sales-report'),
+            path('<str:object_id>/download-pdf/', self.admin_site.admin_view(self.download_pdf), name='product-download-pdf'),
             path('suggest-budget/', self.admin_site.admin_view(self.suggest_budget_view), name='product-suggest-budget'),
             path('sales-graph/', self.admin_site.admin_view(self.sales_graph), name='product-sales-graph'),
             path('sales-predictions/', self.admin_site.admin_view(self.sales_predictions), name='product-sales-predictions'),

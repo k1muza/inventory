@@ -1,6 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 import math
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q, Count, Case, When, Value, QuerySet
@@ -11,6 +12,7 @@ from django.utils.functional import cached_property
 
 
 class Product(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     supplier = models.ForeignKey('inventory.Supplier', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)

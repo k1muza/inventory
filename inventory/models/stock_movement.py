@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
@@ -10,6 +11,7 @@ class StockMovement(models.Model):
         ('OUT', 'Stock Out'),
     ]
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey('inventory.Product', related_name='stock_movements', on_delete=models.CASCADE)
     movement_type = models.CharField(max_length=10, choices=MOVEMENT_TYPES)
     quantity = models.DecimalField(decimal_places=3, max_digits=15)
@@ -18,7 +20,7 @@ class StockMovement(models.Model):
 
     # GenericForeignKey fields
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_id = models.UUIDField(null=True, blank=True)
     linked_object = GenericForeignKey('content_type', 'object_id')
 
     class Meta:

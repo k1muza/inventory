@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericRelation
@@ -6,6 +7,7 @@ from inventory.models.stock_batch import StockBatch
 
 
 class PurchaseItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     purchase = models.ForeignKey('inventory.Purchase', related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey('inventory.Product', on_delete=models.CASCADE, related_name='purchase_items')
     quantity = models.DecimalField(decimal_places=3, max_digits=15)
