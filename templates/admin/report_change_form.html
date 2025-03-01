@@ -29,9 +29,8 @@
 {% if change %}
 <li>
     <a href="{% url 'admin:income-statement' object_id=original.pk %}" class="historylink">Income Statement</a>
-    <a href="{% url 'admin:open-balance-sheet' object_id=original.pk %}" class="historylink">Opening Balance Sheet</a>
-    <a href="{% url 'admin:close-balance-sheet' object_id=original.pk %}" class="historylink">Closing Balance Sheet</a>
-    <a href="{% url 'admin:distribution-report' object_id=original.pk %}" class="historylink">Profitability Report</a>
+    <a href="{% url 'admin:movement-report' object_id=original.pk %}" class="historylink">Inventory Movement Report</a>
+    <a href="{% url 'admin:profitability-report' object_id=original.pk %}" class="historylink">Profitability Report</a>
 </li>
 {% endif %}
 {% endblock %}

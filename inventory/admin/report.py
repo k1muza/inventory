@@ -108,19 +108,14 @@ class ReportAdmin(admin.ModelAdmin):
                 name='income-statement',
             ),
             path(
-                '<int:object_id>/open-balance-sheet/',
-                self.admin_site.admin_view(self.open_balance_sheet),
-                name='open-balance-sheet',
+                '<int:object_id>/movement-report/',
+                self.admin_site.admin_view(self.movement_report),
+                name='movement-report',
             ),
             path(
-                '<int:object_id>/close-balance-sheet/',
-                self.admin_site.admin_view(self.close_balance_sheet),
-                name='close-balance-sheet',
-            ),
-            path(
-                '<int:object_id>/distribution-report/',
+                '<int:object_id>/profitability-report/',
                 self.admin_site.admin_view(self.profitability_report),
-                name='distribution-report',
+                name='profitability-report',
             )
         ]
         return custom_urls + urls
@@ -161,13 +156,16 @@ class ReportAdmin(admin.ModelAdmin):
         response["Content-Disposition"] = f"attachment; filename={filename}"
         return response
 
-    def close_balance_sheet(self, request, object_id, *args, **kwargs):
+    def movement_report(self, request, object_id, *args, **kwargs):
         report = get_object_or_404(Report, pk=object_id)
         # Render HTML template
         html_content = render(
             request,
-            "admin/balance_sheet.html",
-            {"report": report, "balance_type": "Closing"}
+            "admin/movements_report.html",
+            {
+                "report": report,
+                "generated_at": timezone.now(),
+            }
         ).content.decode("utf-8")
 
         # Convert to PDF
@@ -175,7 +173,7 @@ class ReportAdmin(admin.ModelAdmin):
 
         # Return PDF as response
         response = HttpResponse(pdf, content_type="application/pdf")
-        filename = f"closing_balance_sheet_{report.id}.pdf"
+        filename = f"inventory_movements_{report.id}.pdf"
         response["Content-Disposition"] = f"attachment; filename={filename}"
         return response
 
@@ -184,7 +182,7 @@ class ReportAdmin(admin.ModelAdmin):
         # Render HTML template
         html_content = render(
             request,
-            "admin/distribution_report.html",
+            "admin/profitability_report.html",
             {
                 "report": report,
                 "generated_at": timezone.now(),

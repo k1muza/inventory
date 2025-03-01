@@ -31,3 +31,8 @@ def formatquantity(value, unit):
         return f"{value:.0f}"
     else:
         return f"{value:.3f}"
+
+
+@register.filter(name="split")
+def split(value, arg):
+    return value.split(arg)
