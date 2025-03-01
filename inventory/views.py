@@ -3,23 +3,35 @@ from decimal import Decimal
 import decimal
 from io import StringIO
 import re
+from datetime import datetime
+from typing import List
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.db import transaction
+from django.http import HttpResponse, HttpRequest
+
 from .models import Product, Purchase, Sale, StockMovement
 from .forms import PurchasesForm, SalesForm, StockAdjustmentForm
 
 
 @transaction.atomic
-def stock_new(request):
+def stock_new(request: HttpRequest) -> HttpResponse:
+    """
+    Form for recording stock adjustments.
+
+    Handles POST requests with form data and redirects to the same page.
+
+    :param request: The request object.
+    :return: The rendered form page as an HTTP response.
+    """
     if request.method == "POST":
         form = StockAdjustmentForm(request.POST)
         if form.is_valid():
             stock_data = form.cleaned_data["stock_data"]
-            stock_date = form.cleaned_data["date"]
-            create_missing_products = form.cleaned_data["create_missing_products"]
-            adjustments = []
-            errors = []
+            stock_date: datetime = form.cleaned_data["date"]
+            create_missing_products: bool = form.cleaned_data["create_missing_products"]
+            adjustments: List[StockMovement] = []
+            errors: List[str] = []
 
             f = StringIO(stock_data)
             reader = csv.reader(f, delimiter=",", skipinitialspace=True)
@@ -31,10 +43,10 @@ def stock_new(request):
             for line in reader:
                 # Parse each line
                 product_name = line[0].strip()
-                purchase_price = float(line[1].strip())
-                selling_price = float(line[2].strip())
-                quantity = float(line[3].strip())
-                unit = line[4].strip()
+                purchase_price: float = float(line[1].strip())
+                selling_price: float = float(line[2].strip())
+                quantity: float = float(line[3].strip())
+                unit: str = line[4].strip()
 
                 # Match product name
                 try:
@@ -83,13 +95,21 @@ def stock_new(request):
 
 
 @transaction.atomic
-def sales_form(request):
+def sales_form(request: HttpRequest) -> HttpResponse:
+    """
+    Form for recording sales.
+
+    Handles POST requests with form data and redirects to the same page.
+
+    :param request: The request object.
+    :return: The rendered page.
+    """
     if request.method == "POST":
         form = SalesForm(request.POST)
         if form.is_valid():
-            sales_data = form.cleaned_data["sales_data"]
-            sales_date = form.cleaned_data["date"]
-            errors = []
+            sales_data: str = form.cleaned_data["sales_data"]
+            sales_date: datetime.date = form.cleaned_data["date"]
+            errors: List[str] = []
 
             f = StringIO(sales_data)
             reader = csv.reader(f, delimiter=",", skipinitialspace=True)
@@ -98,25 +118,25 @@ def sales_form(request):
 
             for line in reader:
                 # e.g. line[0] might be "Beef (5.50)", line[1] might be "4.365"
-                raw_product_name = line[0].strip()
+                raw_product_name: str = line[0].strip()
 
                 # 1. Extract selling_price from parentheses, e.g. (5.50)
                 match = re.search(r'\((.*?)\)', raw_product_name)
                 if match:
                     # Convert bracketed text to float
-                    selling_price = Decimal(match.group(1))
+                    selling_price: Decimal = Decimal(match.group(1))
                 else:
                     # If there's no bracket, set a default or handle error
                     selling_price = Decimal(0.0)
 
                 # 2. Remove the (price) part from the product name
-                product_name = re.sub(r'\(.*?\)', '', raw_product_name).strip()
+                product_name: str = re.sub(r'\(.*?\)', '', raw_product_name).strip()
 
                 # 3. Parse quantity from second column
                 # e.g. "4.365" or "11.295"
-                quantity_str = line[1].strip()
+                quantity_str: str = line[1].strip()
                 try:
-                    quantity = Decimal(quantity_str)
+                    quantity: Decimal = Decimal(quantity_str)
                 except ValueError:
                     errors.append(f"Invalid quantity '{quantity_str}' for line: {line}")
                     raise ValueError(f"Bad quantity format: {quantity_str}")
@@ -125,7 +145,7 @@ def sales_form(request):
                     raise ValueError(f"Bad quantity format: {quantity_str}")
 
                 try:
-                    product = Product.objects.get(name__iexact=product_name)
+                    product: Product = Product.objects.get(name__iexact=product_name)
                 except Product.DoesNotExist:
                     errors.append(f"Product '{product_name}' not found.")
                     continue
@@ -150,14 +170,22 @@ def sales_form(request):
 
 
 @transaction.atomic
-def purchases_form(request):
+def purchases_form(request: HttpRequest) -> HttpResponse:
+    """
+    Form for recording purchases.
+
+    Handles POST requests with form data and redirects to the same page.
+
+    :param request: The request object.
+    :return: The rendered form page.
+    """
     if request.method == "POST":
         form = PurchasesForm(request.POST)
         if form.is_valid():
             purchases_data = form.cleaned_data["purchases_data"]
-            purchases_date = form.cleaned_data["date"]
-            create_missing_products = form.cleaned_data["create_missing_products"]
-            errors = []
+            purchases_date: datetime = form.cleaned_data["date"]
+            create_missing_products: bool = form.cleaned_data["create_missing_products"]
+            errors: list[str] = []
 
             f = StringIO(purchases_data)
             reader = csv.reader(f, delimiter=",", skipinitialspace=True)
@@ -168,12 +196,12 @@ def purchases_form(request):
                 quantity_str = line[1].strip()
                 match = re.match(r"(\d+(\.\d+)?)", quantity_str)
                 if match:
-                    quantity = Decimal(match.group(1))
+                    quantity: Decimal = Decimal(match.group(1))
                 else:
                     messages.error(request, f"Invalid quantity: {quantity_str}")
                     raise ValueError(f"Bad quantity format: {quantity_str}")
 
-                purchase_price = Decimal(line[2].replace("$", "").strip())
+                purchase_price: Decimal = Decimal(line[2].replace("$", "").strip())
 
                 try:
                     product = Product.objects.get(name__iexact=product_name)
