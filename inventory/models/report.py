@@ -48,7 +48,7 @@ class Report(models.Model):
         from inventory.models import Expense
         return Expense.objects.filter(date__range=[self.open_date, self.close_date]).aggregate(
             total=Sum('amount')
-        )['total']
+        )['total'] or 0
 
     @property
     def net_profit(self):
