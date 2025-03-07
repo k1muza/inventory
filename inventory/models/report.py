@@ -239,7 +239,7 @@ class Report(models.Model):
                 ),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
-        ).aggregate(total=Coalesce(Sum('value'), Value(Decimal(0.0))))['total']
+        ).aggregate(total=Coalesce(Sum('value'), Value(Decimal(0.0))))['total'] or 0
 
     def get_cash_at(self, date):
         from inventory.models import Transaction

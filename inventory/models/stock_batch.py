@@ -224,7 +224,7 @@ class StockBatch(models.Model):
             movement_type=BatchMovement.MovementType.IN
         ).aggregate(
             total=Coalesce(Sum('quantity'), Decimal(0.0))
-        )['total']
+        )['total'] or 0
 
         # Sum all 'OUT' movements prior to or at `date`
         total_out = self.movements.filter(
@@ -232,6 +232,6 @@ class StockBatch(models.Model):
             movement_type=BatchMovement.MovementType.OUT
         ).aggregate(
             total=Coalesce(Sum('quantity'), Decimal(0.0))
-        )['total']
+        )['total'] or 0
 
         return total_in - total_out
