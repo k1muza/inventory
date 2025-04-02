@@ -288,8 +288,9 @@ class Product(models.Model):
         from inventory.models import StockBatch
         remaining = quantity
         while remaining > 0:
-            batch: StockBatch = self.batches.annotate_remaining_quantities().filter(outstanding__gt=0.0001).earliest('date_received')
-            if batch is None:
+            try:
+                batch: StockBatch = self.batches.annotate_remaining_quantities().filter(outstanding__gt=0.0001).earliest('date_received')
+            except StockBatch.DoesNotExist as e:
                 raise ValueError(f"Insufficient stock for {quantity} {self.unit} of {self.name} on {obj}")
 
             remaining = batch.consume(remaining, obj)

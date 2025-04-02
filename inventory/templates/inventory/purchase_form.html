@@ -2,6 +2,12 @@
 
 {% block title %}Purchases{% endblock %}
 
+{% block alerts %}
+    {% if form.errors %}
+        {{ field.errors }}
+    {% endif %}
+{% endblock %}
+
 {% block content %}
   <h2 class="mb-4">New Purchases</h2>
   <form method="post">

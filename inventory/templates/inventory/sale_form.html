@@ -1,5 +1,15 @@
 {% extends 'base.html' %}
 
+{% block alerts %}
+    {% if form.errors %}
+        {% for field in form %}
+            {% if field.errors %}
+                {{ field.errors }}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endblock %}
+
 {% block title %}Sales{% endblock %}
 
 {% block content %}
